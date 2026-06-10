@@ -335,11 +335,44 @@ function markReplied(id) {
 function sendFollowup(id) {
   const b = bookings.find(x => x.id === id);
   if (!b) return;
-  const subject = encodeURIComponent(`Follow-up: ${b.ref} — ${b.guest}`);
-  const body = encodeURIComponent(
-    `Dear Reservations Team,\n\nThis is a follow-up on our booking enquiry sent on ${b.sent}.\n\nBooking reference: ${b.ref}\nGuest / Group: ${b.guest}\nCheck-in: ${b.checkin}\n\nCould you please confirm availability and rates at your earliest convenience?\n\nThank you and best regards,\n${b.agent}\nAsia Evolution Tour Co., Ltd.\nbooking@evolutiontour.com`
-  );
-  window.open(`mailto:${b.hemail}?subject=${subject}&body=${body}`);
+  const text =
+`To: ${b.hemail}
+Subject: Follow-up: ${b.ref} — ${b.guest}
+
+Dear Reservations Team,
+
+This is a follow-up on our booking enquiry sent on ${b.sent}.
+
+Booking reference: ${b.ref}
+Guest / Group: ${b.guest}
+Check-in: ${b.checkin}
+
+Could you please confirm availability and rates at your earliest convenience?
+
+Thank you and best regards,
+${b.agent}
+Asia Evolution Tour Co., Ltd.
+booking@evolutiontour.com`;
+
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('✅ Follow-up email copied — paste it into Gmail');
+  }).catch(() => {
+    prompt('Copy this follow-up email:', text);
+  });
+}
+
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity 0.3s';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3000);
 }
 
 function exportCSV() {
