@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AET Booking Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;min-height:100vh}
+  .page{max-width:1200px;margin:0 auto;padding:1.5rem}
+  h1{font-size:20px;font-weight:600;margin-bottom:2px}
+  .subtitle{font-size:13px;color:#666;margin-bottom:1.5rem}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem}
+  .stat{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;padding:14px 16px}
+  .stat-label{font-size:12px;color:#888;margin-bottom:4px}
+  .stat-val{font-size:24px;font-weight:600}
+  .stat-val.red{color:#a32d2d}
+  .stat-val.amber{color:#7a4a00}
+  .stat-val.green{color:#2d6e2d}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+  .toolbar input,.toolbar select{font-size:13px;padding:7px 11px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;height:36px;outline:none}
+  .toolbar input:focus,.toolbar select:focus{border-color:#888}
+  .toolbar input{flex:1;min-width:160px}
+  .btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 14px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer;height:36px;white-space:nowrap;text-decoration:none}
+  .btn:hover{background:#f0f0ee}
+  .btn.primary{background:#1a7a55;border-color:#1a7a55;color:#fff}
+  .btn.primary:hover{background:#145e41}
+  .filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
+  .filter-btn{font-size:12px;padding:5px 13px;border:0.5px solid #ddd;border-radius:20px;background:#fff;color:#666;cursor:pointer}
+  .filter-btn:hover{background:#f0f0ee}
+  .filter-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+  .table-wrap{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow:hidden;overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+  thead tr{border-bottom:0.5px solid #e0e0dc;background:#fafaf8}
+  th{padding:10px 12px;text-align:left;font-weight:500;color:#666;font-size:12px;white-space:nowrap}
+  td{padding:9px 12px;border-bottom:0.5px solid #f0f0ec;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:#fafaf8}
+  .alert-row td:first-child{border-left:3px solid #c0392b}
+  .alert-row{background:#fff8f8}
+  .badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+  .b-pending{background:#fef3e2;color:#7a4a00}
+  .b-alert{background:#fce8e8;color:#a32d2d}
+  .b-confirmed{background:#e8f5e9;color:#2d6e2d}
+  .b-cancelled{background:#f0f0ee;color:#666}
+  .actions{display:flex;gap:4px}
+  .icon-btn{background:transparent;border:none;cursor:pointer;color:#999;font-size:16px;padding:3px 5px;border-radius:5px;display:inline-flex;align-items:center}
+  .icon-btn:hover{color:#1a1a1a;background:#f0f0ee}
+  .days-warn{color:#a32d2d;font-weight:600}
+  .days-ok{color:#999}
+  .empty{text-align:center;padding:3rem;color:#999;font-size:13px}
+  .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:center;justify-content:center}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:14px;border:0.5px solid #ddd;padding:1.75rem;width:min(560px,95vw);max-height:92vh;overflow-y:auto}
+  .modal h2{font-size:17px;font-weight:600;margin-bottom:1.25rem}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:#666;margin-bottom:5px;font-weight:500}
+  .field input,.field select,.field textarea{width:100%;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;outline:none}
+  .field input:focus,.field select:focus,.field textarea:focus{border-color:#888}
+  .field textarea{resize:vertical;min-height:65px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:0.5px solid #eee}
+  .detail-panel{display:none;background:#fafaf8;border-top:0.5px solid #e0e0dc;padding:12px 16px;font-size:13px;color:#555}
+  .detail-panel.open{display:block}
+  .tag{display:inline-block;font-size:11px;background:#f0f0ee;color:#555;padding:2px 8px;border-radius:20px;margin-right:4px}
+  @media(max-width:600px){.row2{grid-template-columns:1fr}.page{padding:1rem}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">
+    <div>
+      <h1>AET Booking Tracker</h1>
+      <div class="subtitle">Asia Evolution Tour — booking@evolutiontour.com</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
+      <button class="btn primary" onclick="openModal()"><i class="ti ti-plus"></i> New booking</button>
+    </div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('alert',this)"><i class="ti ti-alert-circle"></i> Follow-up required</button>
+    <button class="filter-btn" onclick="setFilter('waiting',this)">Awaiting reply</button>
+    <button class="filter-btn" onclick="setFilter('confirmed',this)">Confirmed</button>
+    <button class="filter-btn" onclick="setFilter('cancelled',this)">Cancelled</button>
+  </div>
+
+  <div class="toolbar">
+    <input type="text" id="search" placeholder="Search booking, hotel, guest, agent..." oninput="render()">
+    <select id="agentFilter" onchange="render()"><option value="">All agents</option></select>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Ref.</th>
+        <th>Hotel / Supplier</th>
+        <th>Guest / Group</th>
+        <th>Check-in</th>
+        <th>Agent</th>
+        <th>Status</th>
+        <th>Email sent</th>
+        <th>Days waiting</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div id="empty" class="empty" style="display:none">
+      <i class="ti ti-inbox" style="font-size:28px;display:block;margin-bottom:8px"></i>
+      No bookings match your filter
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="modal" onclick="bgClose(event)">
+<div class="modal">
+  <h2 id="modal-title">New booking</h2>
+  <div class="row2">
+    <div class="field"><label>Booking ref.</label><input id="f-ref" placeholder="AET-2026-001"></div>
+    <div class="field"><label>Your name (agent)</label><input id="f-agent" placeholder="Name"></div>
+  </div>
+  <div class="field"><label>Hotel / Supplier</label><input id="f-hotel" placeholder="e.g. Centara Koh Chang Resort"></div>
+  <div class="field"><label>Guest / Group name</label><input id="f-guest" placeholder="Guest or group name"></div>
+  <div class="row2">
+    <div class="field"><label>Check-in date</label><input type="date" id="f-checkin"></div>
+    <div class="field"><label>Status</label>
+      <select id="f-status">
+        <option value="pending">Sent — awaiting reply</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="cancelled">Cancelled</option>
+      </select>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Email sent to hotel (date)</label><input type="date" id="f-sent"></div>
+    <div class="field"><label>Reply received (date)</label><input type="date" id="f-reply"></div>
+  </div>
+  <div class="field"><label>Hotel email address</label><input id="f-hemail" placeholder="reservations@hotel.com" type="email"></div>
+  <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Special requests, follow-ups, internal notes..."></textarea></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal()">Cancel</button>
+    <button class="btn primary" onclick="saveBooking()">Save booking</button>
+  </div>
+</div>
+</div>
+
+<script>
+let bookings = JSON.parse(localStorage.getItem('aet_bookings') || '[]');
+let editId = null;
+let currentFilter = 'all';
+
+// Seed demo data if empty
+if (bookings.length === 0) {
+  const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().split('T')[0]; };
+  bookings = [
+    {id:1,ref:'AET-001',hotel:'Centara Koh Chang Resort',guest:'Hansen group (12 pax)',checkin:d(14),agent:'Winnie',status:'pending',sent:d(-3),reply:'',hemail:'res@centara-kohchang.com',notes:'DBL x5, SGL x2. Asked about early check-in.'},
+    {id:2,ref:'AET-002',hotel:'Layana Resort Koh Lanta',guest:'Albatros Travel DK',checkin:d(21),agent:'Air',status:'confirmed',sent:d(-5),reply:d(-4),hemail:'reservations@layana.com',notes:'Confirmation received. Voucher sent.'},
+    {id:3,ref:'AET-003',hotel:'Anantara Chiang Mai',guest:'Unique Travel SE',checkin:d(8),agent:'Soren',status:'pending',sent:d(-1),reply:'',hemail:'chm@anantara.com',notes:'Waiting for room rate for November.'},
+    {id:4,ref:'AET-004',hotel:'Seatran Pioneer Ferry',guest:'Dan Explorer group',checkin:d(5),agent:'Winnie',status:'pending',sent:d(-4),reply:'',hemail:'booking@seatran.co.th',notes:'10 pax Koh Samui–Donsak. No reply in 4 days!'},
+    {id:5,ref:'AET-005',hotel:'Four Seasons Chiang Rai',guest:'Albatros Travel NO',checkin:d(30),agent:'Air',status:'pending',sent:d(0),reply:'',hemail:'fschiangrai@fourseasons.com',notes:'New enquiry sent today.'},
+  ];
+  save();
+}
+
+function save() { localStorage.setItem('aet_bookings', JSON.stringify(bookings)); }
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  return Math.floor((new Date() - new Date(dateStr)) / 86400000);
+}
+
+function needsFollowup(b) {
+  return b.status === 'pending' && !b.reply && daysSince(b.sent) >= 2;
+}
+
+function setFilter(f, el) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  render();
+}
+
+function render() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const ag = document.getElementById('agentFilter').value;
+
+  // Rebuild agent dropdown
+  const agents = [...new Set(bookings.map(b => b.agent))].filter(Boolean).sort();
+  const sel = document.getElementById('agentFilter');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a =>
+    `<option value="${a}"${a === cur ? ' selected' : ''}>${a}</option>`).join('');
+
+  let filtered = bookings.filter(b => {
+    if (q && !`${b.ref} ${b.hotel} ${b.guest} ${b.agent} ${b.notes}`.toLowerCase().includes(q)) return false;
+    if (ag && b.agent !== ag) return false;
+    if (currentFilter === 'alert') return needsFollowup(b);
+    if (currentFilter === 'waiting') return b.status === 'pending' && !b.reply;
+    if (currentFilter === 'confirmed') return b.status === 'confirmed';
+    if (currentFilter === 'cancelled') return b.status === 'cancelled';
+    return true;
+  });
+
+  // Sort: alerts first, then by check-in
+  filtered.sort((a, b) => {
+    const af = needsFollowup(a), bf = needsFollowup(b);
+    if (af && !bf) return -1;
+    if (!af && bf) return 1;
+    return (a.checkin || '').localeCompare(b.checkin || '');
+  });
+
+  // Stats
+  const alerts = bookings.filter(needsFollowup).length;
+  const confirmed = bookings.filter(b => b.status === 'confirmed').length;
+  const waiting = bookings.filter(b => b.status === 'pending' && !b.reply).length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-label">Total bookings</div><div class="stat-val">${bookings.length}</div></div>
+    <div class="stat"><div class="stat-label">Follow-up required</div><div class="stat-val red">${alerts}</div></div>
+    <div class="stat"><div class="stat-label">Awaiting reply</div><div class="stat-val amber">${waiting}</div></div>
+    <div class="stat"><div class="stat-label">Confirmed</div><div class="stat-val green">${confirmed}</div></div>
+  `;
+
+  const tbody = document.getElementById('tbody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    document.getElementById('empty').style.display = 'block';
+    return;
+  }
+  document.getElementById('empty').style.display = 'none';
+
+  tbody.innerHTML = filtered.map(b => {
+    const days = daysSince(b.sent);
+    const alert = needsFollowup(b);
+    const statusLabel = {pending: 'Awaiting reply', confirmed: 'Confirmed', cancelled: 'Cancelled'};
+    const daysCell = b.sent
+      ? (alert ? `<span class="days-warn">${days} days ⚠</span>` : `<span class="days-ok">${days} days</span>`)
+      : '—';
+    const badge = alert
+      ? `<span class="badge b-alert">Follow up now!</span>`
+      : `<span class="badge ${b.status === 'confirmed' ? 'b-confirmed' : b.status === 'cancelled' ? 'b-cancelled' : 'b-pending'}">${statusLabel[b.status] || b.status}</span>`;
+
+    return `<tr class="${alert ? 'alert-row' : ''}" id="row-${b.id}">
+      <td><strong>${esc(b.ref)}</strong></td>
+      <td>${esc(b.hotel)}${b.hemail ? `<br><span style="font-size:11px;color:#999">${esc(b.hemail)}</span>` : ''}</td>
+      <td>${esc(b.guest)}</td>
+      <td>${b.checkin || '—'}</td>
+      <td><span style="font-size:12px;background:#f0f0ee;padding:2px 9px;border-radius:20px">${esc(b.agent)}</span></td>
+      <td>${badge}</td>
+      <td>${b.sent || '—'}</td>
+      <td>${daysCell}</td>
+      <td><div class="actions">
+        <button class="icon-btn" onclick="editBooking(${b.id})" title="Edit"><i class="ti ti-edit"></i></button>
+        ${b.hemail && b.status === 'pending' ? `<button class="icon-btn" onclick="sendFollowup(${b.id})" title="Send follow-up email"><i class="ti ti-mail"></i></button>` : ''}
+        <button class="icon-btn" onclick="markReplied(${b.id})" title="Mark as replied / confirmed" style="color:#2d6e2d"><i class="ti ti-check"></i></button>
+        <button class="icon-btn" onclick="deleteBooking(${b.id})" title="Delete" style="color:#ccc"><i class="ti ti-trash"></i></button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openModal(b) {
+  editId = b ? b.id : null;
+  document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
+  document.getElementById('f-ref').value = b ? b.ref : '';
+  document.getElementById('f-agent').value = b ? b.agent : '';
+  document.getElementById('f-hotel').value = b ? b.hotel : '';
+  document.getElementById('f-guest').value = b ? b.guest : '';
+  document.getElementById('f-checkin').value = b ? b.checkin : '';
+  document.getElementById('f-status').value = b ? b.status : 'pending';
+  document.getElementById('f-sent').value = b ? b.sent : new Date().toISOString().split('T')[0];
+  document.getElementById('f-reply').value = b ? b.reply : '';
+  document.getElementById('f-hemail').value = b ? b.hemail : '';
+  document.getElementById('f-notes').value = b ? b.notes : '';
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f-ref').focus();
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('open'); }
+function bgClose(e) { if (e.target === document.getElementById('modal')) closeModal(); }
+
+function saveBooking() {
+  const b = {
+    ref: document.getElementById('f-ref').value.trim(),
+    agent: document.getElementById('f-agent').value.trim(),
+    hotel: document.getElementById('f-hotel').value.trim(),
+    guest: document.getElementById('f-guest').value.trim(),
+    checkin: document.getElementById('f-checkin').value,
+    status: document.getElementById('f-status').value,
+    sent: document.getElementById('f-sent').value,
+    reply: document.getElementById('f-reply').value,
+    hemail: document.getElementById('f-hemail').value.trim(),
+    notes: document.getElementById('f-notes').value.trim(),
+  };
+  if (!b.ref || !b.hotel) { alert('Please fill in at least Booking ref. and Hotel.'); return; }
+  if (editId) {
+    const i = bookings.findIndex(x => x.id === editId);
+    if (i >= 0) bookings[i] = { ...bookings[i], ...b };
+  } else {
+    b.id = Date.now();
+    bookings.push(b);
+  }
+  save(); closeModal(); render();
+}
+
+function editBooking(id) { const b = bookings.find(x => x.id === id); if (b) openModal(b); }
+
+function deleteBooking(id) {
+  if (confirm('Delete this booking?')) {
+    bookings = bookings.filter(x => x.id !== id);
+    save(); render();
+  }
+}
+
+function markReplied(id) {
+  const b = bookings.find(x => x.id === id);
+  if (b) {
+    b.reply = new Date().toISOString().split('T')[0];
+    b.status = 'confirmed';
+    save(); render();
+  }
+}
+
+function sendFollowup(id) {
+  const b = bookings.find(x => x.id === id);
+  if (!b) return;
+  const subject = encodeURIComponent(`Follow-up: ${b.ref} — ${b.guest}`);
+  const body = encodeURIComponent(
+    `Dear Reservations Team,\n\nThis is a follow-up on our booking enquiry sent on ${b.sent}.\n\nBooking reference: ${b.ref}\nGuest / Group: ${b.guest}\nCheck-in: ${b.checkin}\n\nCould you please confirm availability and rates at your earliest convenience?\n\nThank you and best regards,\n${b.agent}\nAsia Evolution Tour Co., Ltd.\nbooking@evolutiontour.com`
+  );
+  window.open(`mailto:${b.hemail}?subject=${subject}&body=${body}`);
+}
+
+function exportCSV() {
+  const rows = [
+    ['Ref','Hotel','Guest','Check-in','Agent','Status','Email sent','Reply received','Hotel email','Notes'],
+    ...bookings.map(b => [b.ref,b.hotel,b.guest,b.checkin,b.agent,b.status,b.sent,b.reply,b.hemail,b.notes])
+  ];
+  const csv = rows.map(r => r.map(c => `"${(c||'').replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = 'AET_bookings_' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+}
+
+// Keyboard shortcut: N = new booking
+document.addEventListener('keydown', e => {
+  if (e.key === 'n' && !document.getElementById('modal').classList.contains('open') &&
+      !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) {
+    openModal();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
