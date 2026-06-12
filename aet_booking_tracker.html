@@ -255,11 +255,12 @@ function render() {
 
       let depHtml = '';
       if (h.deposit && h.deposit.required) {
+        const cur = h.deposit.currency || 'THB';
         if (h.deposit.paid) {
-          depHtml = `<span class="dep-badge dep-paid">✓ Paid${h.deposit.amount ? ' '+h.deposit.amount+' THB' : ''}</span>`;
+          depHtml = `<span class="dep-badge dep-paid">✓ Paid${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''}</span>`;
         } else {
           const inf = h.deposit.informed ? '✓ Informed' : '! Not informed';
-          depHtml = `<span class="dep-badge dep-required">Deposit req.${h.deposit.amount ? ' '+h.deposit.amount+' THB' : ''} · ${inf}</span>`;
+          depHtml = `<span class="dep-badge dep-required">Deposit req.${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`;
         }
       } else {
         depHtml = `<span class="dep-none">—</span>`;
@@ -358,7 +359,7 @@ function addHotelBlock(h) {
       </div>
       <div class="dep-fields" id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
         <div class="row3" style="margin-top:8px">
-          <div class="field"><label>Amount (THB)</label><input type="number" class="hf-dep-amount" placeholder="e.g. 5000" value="${h&&h.deposit?h.deposit.amount:''}"></div>
+          <div class="field"><label>Amount</label><div style="display:flex;gap:6px"><select class="hf-dep-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none"><option value="THB"${h&&h.deposit&&h.deposit.currency==='THB'?' selected':''}>THB</option><option value="USD"${h&&h.deposit&&h.deposit.currency==='USD'?' selected':(!h||!h.deposit||!h.deposit.currency?'':'')}>USD</option><option value="IDR"${h&&h.deposit&&h.deposit.currency==='IDR'?' selected':''}>IDR</option></select><input type="number" class="hf-dep-amount" placeholder="e.g. 5000" value="${h&&h.deposit?h.deposit.amount:''}" style="flex:1"></div></div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
             <div class="checkbox-row">
               <input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}>
@@ -426,6 +427,7 @@ function saveBooking() {
       deposit: {
         required: depReq,
         amount: depReq ? block.querySelector('.hf-dep-amount').value.trim() : '',
+        currency: depReq ? (block.querySelector('.hf-dep-currency') ? block.querySelector('.hf-dep-currency').value : 'THB') : 'THB',
         informed: depReq ? block.querySelector('.hf-dep-informed').checked : false,
         paid: depReq ? block.querySelector('.hf-dep-paid').checked : false,
       }
