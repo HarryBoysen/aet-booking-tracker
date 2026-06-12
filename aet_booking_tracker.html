@@ -345,7 +345,7 @@ function addHotelBlock(h) {
           <option value="cancelled"${h&&h.status==='cancelled'?' selected':''}>Cancelled</option>
         </select>
       </div>
-      <div class="field"><label>Email sent (date)</label><input type="date" class="hf-sent" value="${h?h.sent:''}"></div>
+      <div class="field"><label>Email sent (date)</label><input type="date" class="hf-sent" value="${h?h.sent:new Date().toISOString().split('T')[0]}"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Reply received (date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div>
