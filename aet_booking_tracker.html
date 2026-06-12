@@ -471,23 +471,16 @@ function copyFollowup(bookingId, hotelId, e) {
   const h = b.hotels.find(x => x.id === hotelId);
   if (!h) return;
   const text =
-`Subject: Follow-up: ${b.ref} — ${b.guest}
+`Subject: Follow-up: ${b.ref} — ${h.name}
 
 Dear Reservations Team,
 
 This is a follow-up on our booking enquiry sent on ${h.sent}.
 
-Booking reference: ${b.ref}
-Guest / Group: ${b.guest}
-Hotel: ${h.name}
-Check-in: ${h.checkin}
-
 Could you please confirm availability and rates at your earliest convenience?
 
 Thank you and best regards,
-${b.agent}
-Asia Evolution Tour Co., Ltd.
-booking@evolutiontour.com`;
+Team Asia Evolution`;
 
   navigator.clipboard.writeText(text).then(() => {
     showToast('✅ Follow-up email copied — paste into Gmail (Ctrl+V)');
