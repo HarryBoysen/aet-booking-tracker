@@ -21,14 +21,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .btn:hover{background:#f0f0ee}
 .btn.primary{background:#1a7a55;border-color:#1a7a55;color:#fff}
 .btn.primary:hover{background:#145e41}
-.btn.danger{background:#fff;border-color:#e0a0a0;color:#a32d2d}
-.btn.danger:hover{background:#fff0f0}
 .filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
 .filter-btn{font-size:12px;padding:5px 13px;border:0.5px solid #ddd;border-radius:20px;background:#fff;color:#666;cursor:pointer}
 .filter-btn:hover{background:#f0f0ee}
 .filter-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-
-/* Booking cards */
 .bookings{display:flex;flex-direction:column;gap:12px}
 .booking-card{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow:hidden}
 .booking-card.has-alert{border-left:3px solid #c0392b}
@@ -41,7 +37,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .card-actions{display:flex;gap:6px;align-items:center}
 .icon-btn{background:transparent;border:none;cursor:pointer;color:#999;font-size:16px;padding:4px 6px;border-radius:5px;display:inline-flex;align-items:center}
 .icon-btn:hover{color:#1a1a1a;background:#f0f0ee}
-.card-body{border-top:0.5px solid #f0f0ec;padding:0}
+.card-body{border-top:0.5px solid #f0f0ec}
 .hotels-table{width:100%;border-collapse:collapse;font-size:13px}
 .hotels-table th{padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;background:#fafaf8;border-bottom:0.5px solid #f0f0ec;white-space:nowrap}
 .hotels-table td{padding:9px 14px;border-bottom:0.5px solid #f5f5f3;vertical-align:middle}
@@ -62,8 +58,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .empty{text-align:center;padding:3rem;color:#999;font-size:13px}
 .chevron{transition:transform 0.2s;font-size:18px;color:#ccc}
 .chevron.open{transform:rotate(180deg)}
-
-/* Modal */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
 .modal-bg.open{display:flex}
 .modal{background:#fff;border-radius:14px;border:0.5px solid #ddd;padding:1.75rem;width:min(680px,96vw);margin:auto}
@@ -84,14 +78,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .add-hotel-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:#1a7a55;background:none;border:0.5px dashed #1a7a55;border-radius:8px;padding:8px 14px;cursor:pointer;width:100%;justify-content:center;margin-top:4px}
 .add-hotel-btn:hover{background:#f0faf5}
 .section-divider{font-size:12px;font-weight:600;color:#aaa;margin:16px 0 10px;text-transform:uppercase;letter-spacing:0.05em}
+.name-screen{position:fixed;inset:0;background:#f5f5f3;display:flex;align-items:center;justify-content:center;z-index:500}
+.name-box{background:#fff;border-radius:16px;border:0.5px solid #e0e0dc;padding:2rem;width:min(400px,90vw);text-align:center}
+.name-box h2{font-size:20px;font-weight:600;margin-bottom:8px}
+.name-box p{font-size:13px;color:#888;margin-bottom:1.5rem}
+.name-box input{width:100%;padding:10px 14px;font-size:15px;border:0.5px solid #ccc;border-radius:8px;outline:none;margin-bottom:12px;text-align:center}
+.loading{position:fixed;inset:0;background:#f5f5f3;display:flex;align-items:center;justify-content:center;z-index:400;font-size:14px;color:#888;gap:10px}
 </style>
 </head>
 <body>
-<div class="page">
+
+<!-- Loading screen -->
+<div class="loading" id="loading"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:20px"></i> Connecting...</div>
+<style>@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}</style>
+
+<!-- Name screen -->
+<div class="name-screen" id="nameScreen" style="display:none">
+  <div class="name-box">
+    <h2>Welcome to AET Booking Tracker</h2>
+    <p>Enter your name to get started. This will be shown on your bookings.</p>
+    <input type="text" id="nameInput" placeholder="Your name" maxlength="30">
+    <button class="btn primary" style="width:100%;justify-content:center;height:42px;font-size:14px" onclick="saveName()">Start</button>
+  </div>
+</div>
+
+<div class="page" id="mainApp" style="display:none">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1.25rem">
     <div>
       <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
-      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com</div>
+      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="changeName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(change)</button></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
@@ -129,11 +144,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="field"><label>Your name (agent)</label><input id="f-agent" placeholder="Name"></div>
     <div class="field"><label>Guest / Group name</label><input id="f-guest" placeholder="Guest or group name"></div>
   </div>
-
   <div class="section-divider">Hotels</div>
   <div id="hotel-blocks"></div>
   <button class="add-hotel-btn" onclick="addHotelBlock()"><i class="ti ti-plus"></i> Add hotel</button>
-
   <div class="modal-footer">
     <button class="btn" onclick="closeModal()">Cancel</button>
     <button class="btn primary" onclick="saveBooking()">Save booking</button>
@@ -141,31 +154,76 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
-<script>
-let bookings = JSON.parse(localStorage.getItem('aet_bookings_v2') || '[]');
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAIOaGt05ggJD9mcAa96OymC8_U55O6xQU",
+  authDomain: "aet-booking-tracker.firebaseapp.com",
+  projectId: "aet-booking-tracker",
+  storageBucket: "aet-booking-tracker.firebasestorage.app",
+  messagingSenderId: "750269064961",
+  appId: "1:750269064961:web:814ef3573a9a01dfc2dd00"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let bookings = [];
 let editId = null;
 let currentFilter = 'all';
 let expandedCards = new Set();
+let currentUser = localStorage.getItem('aet_username') || '';
+let hotelCount = 0;
 
-if (bookings.length === 0) {
-  const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().split('T')[0]; };
-  bookings = [
-    {id:1, ref:'AET-001', agent:'Winnie', guest:'Hansen group (12 pax)', hotels:[
-      {id:'h1', name:'Centara Koh Chang Resort', checkin:d(14), status:'pending', sent:d(-3), reply:'', deposit:{required:true, amount:'5000', informed:true, paid:false}},
-      {id:'h2', name:'Seatran Ferry', checkin:d(13), status:'confirmed', sent:d(-5), reply:d(-4), deposit:{required:false, amount:'', informed:false, paid:false}},
-    ]},
-    {id:2, ref:'AET-002', agent:'Air', guest:'Albatros Travel DK', hotels:[
-      {id:'h3', name:'Layana Resort Koh Lanta', checkin:d(21), status:'confirmed', sent:d(-5), reply:d(-4), deposit:{required:true, amount:'8000', informed:true, paid:true}},
-      {id:'h4', name:'Anantara Chiang Mai', checkin:d(23), status:'pending', sent:d(-1), reply:'', deposit:{required:false, amount:'', informed:false, paid:false}},
-    ]},
-    {id:3, ref:'AET-003', agent:'Soren', guest:'Dan Explorer group', hotels:[
-      {id:'h5', name:'Four Seasons Chiang Rai', checkin:d(30), status:'pending', sent:d(-4), reply:'', deposit:{required:true, amount:'12000', informed:false, paid:false}},
-    ]},
-  ];
-  save();
+// Name screen
+document.getElementById('loading').style.display = 'none';
+if (!currentUser) {
+  document.getElementById('nameScreen').style.display = 'flex';
+} else {
+  startApp();
 }
 
-function save() { localStorage.setItem('aet_bookings_v2', JSON.stringify(bookings)); }
+window.saveName = function() {
+  const name = document.getElementById('nameInput').value.trim();
+  if (!name) { alert('Please enter your name.'); return; }
+  localStorage.setItem('aet_username', name);
+  currentUser = name;
+  document.getElementById('nameScreen').style.display = 'none';
+  startApp();
+}
+
+window.changeName = function() {
+  localStorage.removeItem('aet_username');
+  location.reload();
+}
+
+document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') window.saveName(); });
+
+function startApp() {
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('currentUserLabel').textContent = currentUser;
+  document.getElementById('f-agent').value = currentUser;
+
+  // Listen for real-time updates
+  onSnapshot(collection(db, 'bookings'), (snapshot) => {
+    bookings = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    render();
+  });
+}
+
+async function saveToFirebase(booking) {
+  const id = booking.id || 'b_' + Date.now();
+  booking.id = id;
+  await setDoc(doc(db, 'bookings', id), booking);
+  return id;
+}
+
+async function deleteFromFirebase(id) {
+  await deleteDoc(doc(db, 'bookings', id));
+}
 
 function daysSince(dateStr) {
   if (!dateStr) return null;
@@ -176,17 +234,17 @@ function hotelNeedsFollowup(h) {
   return h.status === 'pending' && !h.reply && daysSince(h.sent) >= 2;
 }
 
-function bookingHasAlert(b) { return b.hotels.some(hotelNeedsFollowup); }
-function bookingHasDepositPending(b) { return b.hotels.some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
+function bookingHasAlert(b) { return (b.hotels||[]).some(hotelNeedsFollowup); }
+function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
 
-function setFilter(f, el) {
+window.setFilter = function(f, el) {
   currentFilter = f;
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   el.classList.add('active');
   render();
 }
 
-function toggleCard(id) {
+window.toggleCard = function(id) {
   if (expandedCards.has(id)) expandedCards.delete(id);
   else expandedCards.add(id);
   render();
@@ -203,12 +261,12 @@ function render() {
     `<option value="${a}"${a === cur ? ' selected' : ''}>${a}</option>`).join('');
 
   let filtered = bookings.filter(b => {
-    const hotelNames = b.hotels.map(h => h.name).join(' ');
+    const hotelNames = (b.hotels||[]).map(h => h.name).join(' ');
     if (q && !`${b.ref} ${b.guest} ${b.agent} ${hotelNames}`.toLowerCase().includes(q)) return false;
     if (ag && b.agent !== ag) return false;
     if (currentFilter === 'alert') return bookingHasAlert(b);
     if (currentFilter === 'deposit') return bookingHasDepositPending(b);
-    if (currentFilter === 'confirmed') return b.hotels.every(h => h.status === 'confirmed');
+    if (currentFilter === 'confirmed') return (b.hotels||[]).every(h => h.status === 'confirmed');
     return true;
   });
 
@@ -217,10 +275,10 @@ function render() {
     if (af && !bf) return -1; if (!af && bf) return 1; return 0;
   });
 
-  const totalHotels = bookings.reduce((s, b) => s + b.hotels.length, 0);
-  const alertCount = bookings.reduce((s, b) => s + b.hotels.filter(hotelNeedsFollowup).length, 0);
-  const depPending = bookings.reduce((s, b) => s + b.hotels.filter(h => h.deposit && h.deposit.required && !h.deposit.paid).length, 0);
-  const confirmed = bookings.reduce((s, b) => s + b.hotels.filter(h => h.status === 'confirmed').length, 0);
+  const totalHotels = bookings.reduce((s, b) => s + (b.hotels||[]).length, 0);
+  const alertCount = bookings.reduce((s, b) => s + (b.hotels||[]).filter(hotelNeedsFollowup).length, 0);
+  const depPending = bookings.reduce((s, b) => s + (b.hotels||[]).filter(h => h.deposit && h.deposit.required && !h.deposit.paid).length, 0);
+  const confirmed = bookings.reduce((s, b) => s + (b.hotels||[]).filter(h => h.status === 'confirmed').length, 0);
 
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="stat-label">Total bookings</div><div class="stat-val">${bookings.length}</div></div>
@@ -238,13 +296,16 @@ function render() {
   }
   document.getElementById('empty').style.display = 'none';
 
+  // Auto-expand alert cards
+  bookings.filter(bookingHasAlert).forEach(b => expandedCards.add(b.id));
+
   container.innerHTML = filtered.map(b => {
     const hasAlert = bookingHasAlert(b);
     const isOpen = expandedCards.has(b.id);
-    const hotelCount = b.hotels.length;
-    const confirmedCount = b.hotels.filter(h => h.status === 'confirmed').length;
+    const hotelCount = (b.hotels||[]).length;
+    const confirmedCount = (b.hotels||[]).filter(h => h.status === 'confirmed').length;
 
-    const hotelsHtml = b.hotels.map(h => {
+    const hotelsHtml = (b.hotels||[]).map(h => {
       const alert = hotelNeedsFollowup(h);
       const days = daysSince(h.sent);
       const daysCell = h.sent ? (alert ? `<span class="days-warn">${days}d ⚠</span>` : `<span class="days-ok">${days}d</span>`) : '—';
@@ -252,19 +313,16 @@ function render() {
         : h.status === 'confirmed' ? `<span class="badge b-confirmed">Confirmed</span>`
         : h.status === 'cancelled' ? `<span class="badge b-cancelled">Cancelled</span>`
         : `<span class="badge b-pending">Awaiting</span>`;
-
+      const cur = (h.deposit && h.deposit.currency) || 'THB';
       let depHtml = '';
       if (h.deposit && h.deposit.required) {
-        const cur = h.deposit.currency || 'THB';
         if (h.deposit.paid) {
           depHtml = `<span class="dep-badge dep-paid">✓ Paid${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''}</span>`;
         } else {
           const inf = h.deposit.informed ? '✓ Informed' : '! Not informed';
-          depHtml = `<span class="dep-badge dep-required">Deposit req.${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`;
+          depHtml = `<span class="dep-badge dep-required">Deposit${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`;
         }
-      } else {
-        depHtml = `<span class="dep-none">—</span>`;
-      }
+      } else { depHtml = `<span class="dep-none">—</span>`; }
 
       return `<tr class="${alert ? 'hotel-alert' : ''}">
         <td><strong>${esc(h.name)}</strong></td>
@@ -274,69 +332,71 @@ function render() {
         <td>${h.reply || '—'}</td>
         <td>${daysCell}</td>
         <td>${depHtml}</td>
-        <td>
-          <div style="display:flex;gap:4px">
-            ${alert ? `<button class="icon-btn" title="Copy follow-up email" onclick="copyFollowup(${b.id},'${h.id}',event)" style="color:#c0392b"><i class="ti ti-mail"></i></button>` : ''}
-            <button class="icon-btn" title="Mark replied / confirmed" onclick="markHotelReplied(${b.id},'${h.id}',event)" style="color:#2d6e2d"><i class="ti ti-check"></i></button>
-          </div>
-        </td>
+        <td><div style="display:flex;gap:4px">
+          ${alert ? `<button class="icon-btn" title="Copy follow-up email" onclick="copyFollowup('${b.id}','${h.id}',event)" style="color:#c0392b"><i class="ti ti-mail"></i></button>` : ''}
+          <button class="icon-btn" title="Mark replied / confirmed" onclick="markHotelReplied('${b.id}','${h.id}',event)" style="color:#2d6e2d"><i class="ti ti-check"></i></button>
+        </div></td>
       </tr>`;
     }).join('');
 
     return `<div class="booking-card${hasAlert ? ' has-alert' : ''}" id="card-${b.id}">
-      <div class="card-header" onclick="toggleCard(${b.id})">
+      <div class="card-header" onclick="toggleCard('${b.id}')">
         <div class="card-title">
           <span class="card-ref">${esc(b.ref)}</span>
           <span class="card-guest">${esc(b.guest)}</span>
           <span class="card-agent">${esc(b.agent)}</span>
-          <span style="font-size:12px;color:#aaa">${confirmedCount}/${hotelCount} hotels confirmed</span>
+          <span style="font-size:12px;color:#aaa">${confirmedCount}/${hotelCount} confirmed</span>
           ${hasAlert ? '<span class="badge b-alert">Follow up required</span>' : ''}
         </div>
         <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="icon-btn" title="Edit booking" onclick="editBooking(${b.id})"><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" title="Delete booking" onclick="deleteBooking(${b.id})" style="color:#ddd"><i class="ti ti-trash"></i></button>
+          <button class="icon-btn" title="Edit" onclick="editBooking('${b.id}')"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" title="Delete" onclick="deleteBooking('${b.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
           <i class="ti ti-chevron-down chevron ${isOpen ? 'open' : ''}"></i>
         </div>
       </div>
-      ${isOpen ? `<div class="card-body">
-        <table class="hotels-table">
-          <thead><tr>
-            <th>Hotel / Supplier</th>
-            <th>Check-in</th>
-            <th>Status</th>
-            <th>Email sent</th>
-            <th>Reply received</th>
-            <th>Days waiting</th>
-            <th>Deposit</th>
-            <th></th>
-          </tr></thead>
-          <tbody>${hotelsHtml}</tbody>
-        </table>
-      </div>` : ''}
+      ${isOpen ? `<div class="card-body"><table class="hotels-table">
+        <thead><tr>
+          <th>Hotel / Supplier</th><th>Check-in</th><th>Status</th>
+          <th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th>
+        </tr></thead>
+        <tbody>${hotelsHtml}</tbody>
+      </table></div>` : ''}
     </div>`;
   }).join('');
 }
 
 function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-/* Modal */
-let hotelCount = 0;
+window.openModal = function(b) {
+  editId = b ? b.id : null;
+  hotelCount = 0;
+  document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
+  document.getElementById('f-ref').value = b ? b.ref : '';
+  document.getElementById('f-agent').value = b ? b.agent : currentUser;
+  document.getElementById('f-guest').value = b ? b.guest : '';
+  document.getElementById('hotel-blocks').innerHTML = '';
+  if (b && b.hotels && b.hotels.length > 0) {
+    b.hotels.forEach(h => addHotelBlock(h));
+  } else { addHotelBlock(); }
+  document.getElementById('modal').classList.add('open');
+}
 
-function addHotelBlock(h) {
+window.closeModal = function() { document.getElementById('modal').classList.remove('open'); }
+window.bgClose = function(e) { if (e.target === document.getElementById('modal')) window.closeModal(); }
+
+window.addHotelBlock = function(h) {
   hotelCount++;
   const idx = hotelCount;
-  const hid = h ? h.id : 'new_' + Date.now() + '_' + idx;
+  const hid = h ? h.id : 'h_' + Date.now() + '_' + idx;
+  const today = new Date().toISOString().split('T')[0];
   const div = document.createElement('div');
   div.className = 'hotel-block';
   div.dataset.hid = hid;
   div.innerHTML = `
-    <div class="hotel-block-title">
-      Hotel ${idx}
-      <button type="button" onclick="removeHotelBlock(this)" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px" title="Remove hotel"><i class="ti ti-x"></i></button>
+    <div class="hotel-block-title">Hotel ${idx}
+      <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
     </div>
-    <div class="row2">
-      <div class="field" style="grid-column:1/-1"><label>Hotel / Supplier name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
-    </div>
+    <div class="field"><label>Hotel / Supplier name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
     <div class="row3">
       <div class="field"><label>Check-in date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
       <div class="field"><label>Status</label>
@@ -346,7 +406,7 @@ function addHotelBlock(h) {
           <option value="cancelled"${h&&h.status==='cancelled'?' selected':''}>Cancelled</option>
         </select>
       </div>
-      <div class="field"><label>Email sent (date)</label><input type="date" class="hf-sent" value="${h?h.sent:new Date().toISOString().split('T')[0]}"></div>
+      <div class="field"><label>Email sent (date)</label><input type="date" class="hf-sent" value="${h?h.sent:today}"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Reply received (date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div>
@@ -354,19 +414,28 @@ function addHotelBlock(h) {
     <div class="dep-section">
       <div class="dep-section-title">Deposit / Payment</div>
       <div class="checkbox-row">
-        <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDepFields(this,${idx})">
+        <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDep(this,${idx})">
         <label for="depreq-${idx}" style="cursor:pointer">Deposit / immediate payment required</label>
       </div>
-      <div class="dep-fields" id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
+      <div id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
         <div class="row3" style="margin-top:8px">
-          <div class="field"><label>Amount</label><div style="display:flex;gap:6px"><select class="hf-dep-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none"><option value="THB"${h&&h.deposit&&h.deposit.currency==='THB'?' selected':''}>THB</option><option value="USD"${h&&h.deposit&&h.deposit.currency==='USD'?' selected':(!h||!h.deposit||!h.deposit.currency?'':'')}>USD</option><option value="IDR"${h&&h.deposit&&h.deposit.currency==='IDR'?' selected':''}>IDR</option></select><input type="number" class="hf-dep-amount" placeholder="e.g. 5000" value="${h&&h.deposit?h.deposit.amount:''}" style="flex:1"></div></div>
-          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
+          <div class="field"><label>Amount</label>
+            <div style="display:flex;gap:6px">
+              <select class="hf-dep-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none">
+                <option value="THB"${!h||!h.deposit||h.deposit.currency==='THB'?' selected':''}>THB</option>
+                <option value="USD"${h&&h.deposit&&h.deposit.currency==='USD'?' selected':''}>USD</option>
+                <option value="IDR"${h&&h.deposit&&h.deposit.currency==='IDR'?' selected':''}>IDR</option>
+              </select>
+              <input type="number" class="hf-dep-amount" placeholder="e.g. 5000" value="${h&&h.deposit?h.deposit.amount:''}" style="flex:1">
+            </div>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
             <div class="checkbox-row">
               <input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}>
               <label for="depinf-${idx}" style="cursor:pointer">Account informed</label>
             </div>
           </div>
-          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:2px">
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
             <div class="checkbox-row">
               <input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}>
               <label for="deppaid-${idx}" style="cursor:pointer">Account paid</label>
@@ -374,46 +443,22 @@ function addHotelBlock(h) {
           </div>
         </div>
       </div>
-    </div>
-  `;
+    </div>`;
   document.getElementById('hotel-blocks').appendChild(div);
 }
 
-function toggleDepFields(cb, idx) {
+window.toggleDep = function(cb, idx) {
   document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none';
 }
 
-function removeHotelBlock(btn) {
-  btn.closest('.hotel-block').remove();
-}
-
-function openModal(b) {
-  editId = b ? b.id : null;
-  hotelCount = 0;
-  document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
-  document.getElementById('f-ref').value = b ? b.ref : '';
-  document.getElementById('f-agent').value = b ? b.agent : '';
-  document.getElementById('f-guest').value = b ? b.guest : '';
-  document.getElementById('hotel-blocks').innerHTML = '';
-  if (b && b.hotels.length > 0) {
-    b.hotels.forEach(h => addHotelBlock(h));
-  } else {
-    addHotelBlock();
-  }
-  document.getElementById('modal').classList.add('open');
-}
-
-function closeModal() { document.getElementById('modal').classList.remove('open'); }
-function bgClose(e) { if (e.target === document.getElementById('modal')) closeModal(); }
-
-function saveBooking() {
+window.saveBooking = async function() {
   const ref = document.getElementById('f-ref').value.trim();
   const agent = document.getElementById('f-agent').value.trim();
   const guest = document.getElementById('f-guest').value.trim();
   if (!ref || !agent) { alert('Please fill in Booking ref. and Your name.'); return; }
 
   const hotels = [];
-  document.querySelectorAll('.hotel-block').forEach((block, i) => {
+  document.querySelectorAll('.hotel-block').forEach(block => {
     const name = block.querySelector('.hf-name').value.trim();
     if (!name) return;
     const depReq = block.querySelector('.hf-dep-req').checked;
@@ -426,8 +471,8 @@ function saveBooking() {
       reply: block.querySelector('.hf-reply').value,
       deposit: {
         required: depReq,
+        currency: depReq ? block.querySelector('.hf-dep-currency').value : 'THB',
         amount: depReq ? block.querySelector('.hf-dep-amount').value.trim() : '',
-        currency: depReq ? (block.querySelector('.hf-dep-currency') ? block.querySelector('.hf-dep-currency').value : 'THB') : 'THB',
         informed: depReq ? block.querySelector('.hf-dep-informed').checked : false,
         paid: depReq ? block.querySelector('.hf-dep-paid').checked : false,
       }
@@ -435,27 +480,24 @@ function saveBooking() {
   });
 
   if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
-
-  if (editId) {
-    const i = bookings.findIndex(x => x.id === editId);
-    if (i >= 0) bookings[i] = { ...bookings[i], ref, agent, guest, hotels };
-  } else {
-    bookings.push({ id: Date.now(), ref, agent, guest, hotels });
-  }
-  save(); closeModal(); render();
+  const booking = { id: editId || 'b_' + Date.now(), ref, agent, guest, hotels };
+  await saveToFirebase(booking);
+  window.closeModal();
 }
 
-function editBooking(id) { const b = bookings.find(x => x.id === id); if (b) { expandedCards.add(id); openModal(b); } }
+window.editBooking = function(id) {
+  const b = bookings.find(x => x.id === id);
+  if (b) { expandedCards.add(id); window.openModal(b); }
+}
 
-function deleteBooking(id) {
+window.deleteBooking = async function(id) {
   if (confirm('Delete this booking and all its hotels?')) {
-    bookings = bookings.filter(x => x.id !== id);
+    await deleteFromFirebase(id);
     expandedCards.delete(id);
-    save(); render();
   }
 }
 
-function markHotelReplied(bookingId, hotelId, e) {
+window.markHotelReplied = async function(bookingId, hotelId, e) {
   e.stopPropagation();
   const b = bookings.find(x => x.id === bookingId);
   if (!b) return;
@@ -463,10 +505,10 @@ function markHotelReplied(bookingId, hotelId, e) {
   if (!h) return;
   h.reply = new Date().toISOString().split('T')[0];
   h.status = 'confirmed';
-  save(); render();
+  await saveToFirebase(b);
 }
 
-function copyFollowup(bookingId, hotelId, e) {
+window.copyFollowup = function(bookingId, hotelId, e) {
   e.stopPropagation();
   const b = bookings.find(x => x.id === bookingId);
   if (!b) return;
@@ -486,31 +528,16 @@ Team Asia Evolution`;
 
   navigator.clipboard.writeText(text).then(() => {
     showToast('✅ Follow-up email copied — paste into Gmail (Ctrl+V)');
-  }).catch(() => {
-    prompt('Copy this follow-up email:', text);
-  });
+  }).catch(() => { prompt('Copy this follow-up email:', text); });
 }
 
-function showToast(msg) {
-  let t = document.getElementById('toast');
-  if (!t) {
-    t = document.createElement('div');
-    t.id = 'toast';
-    t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none';
-    document.body.appendChild(t);
-  }
-  t.textContent = msg;
-  t.style.opacity = '1';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
-}
-
-function exportCSV() {
-  const rows = [['Ref','Agent','Guest','Hotel','Check-in','Status','Email sent','Reply','Days waiting','Deposit required','Amount THB','Account informed','Account paid']];
+window.exportCSV = function() {
+  const rows = [['Ref','Agent','Guest','Hotel','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Account informed','Account paid']];
   bookings.forEach(b => {
-    b.hotels.forEach(h => {
-      const days = daysSince(h.sent);
-      rows.push([b.ref, b.agent, b.guest, h.name, h.checkin, h.status, h.sent, h.reply, days||'', h.deposit.required?'Yes':'No', h.deposit.amount||'', h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No']);
+    (b.hotels||[]).forEach(h => {
+      rows.push([b.ref, b.agent, b.guest, h.name, h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
+        h.deposit.required?'Yes':'No', h.deposit.currency||'THB', h.deposit.amount||'',
+        h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No']);
     });
   });
   const csv = rows.map(r => r.map(c => `"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
@@ -520,9 +547,12 @@ function exportCSV() {
   a.click();
 }
 
-// Auto-expand cards with alerts
-bookings.filter(bookingHasAlert).forEach(b => expandedCards.add(b.id));
-render();
+function showToast(msg) {
+  let t = document.getElementById('toast');
+  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none'; document.body.appendChild(t); }
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._timer); t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
 </script>
 </body>
 </html>
