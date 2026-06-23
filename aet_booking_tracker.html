@@ -195,7 +195,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- STATS TAB -->
   <div class="tab-panel" id="panel-stats-tab">
-    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received", across all bookings (active + archived).</div>
+    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received". Room nights = days between Check-in and Check-out. Based on all bookings (active + archived).</div>
+    <div class="stats" style="margin-bottom:1rem">
+      <div class="stat"><div class="stat-label">Total room nights booked</div><div class="stat-val" id="totalNightsStat">0</div></div>
+    </div>
     <div class="toolbar">
       <input type="text" id="statsSearch" placeholder="Search hotel name..." oninput="renderStats()">
     </div>
@@ -418,19 +421,19 @@ window.toggleCard = function(id) {
   render();
 }
 
-let currentAgentFilter = '';
-function render() {
+window.currentAgentFilter = '';
+window.render = function render() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  const ag = currentAgentFilter;
+  const ag = window.currentAgentFilter;
 
-  const agents = [...new Set(bookings.map(b => b.agent))].filter(Boolean).sort();
+  const agents = [...new Set(bookings.map(b => (b.agent||'').trim()))].filter(Boolean).sort();
   const sel = document.getElementById('agentFilter');
-  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a => `<option value="${a}"${a === ag ? ' selected' : ''}>${a}</option>`).join('');
+  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a => `<option value="${esc(a)}"${a === ag.trim() ? ' selected' : ''}>${esc(a)}</option>`).join('');
 
   let filtered = bookings.filter(b => {
     const hotelNames = (b.hotels||[]).map(h => h.name).join(' ');
     if (q && !`${b.ref} ${b.guest} ${b.agent} ${hotelNames}`.toLowerCase().includes(q)) return false;
-    if (ag && b.agent !== ag) return false;
+    if (ag && (b.agent||'').trim().toLowerCase() !== ag.trim().toLowerCase()) return false;
     if (currentFilter === 'archived') return !!b.archived;
     if (b.archived) return false; // hide archived from all other views
     if (currentFilter === 'alert') return bookingHasAlert(b);
@@ -488,6 +491,7 @@ function render() {
       return `<tr class="${alert ? 'hotel-alert' : ''}">
         <td><strong>${esc(h.name)}</strong></td>
         <td>${h.checkin || '—'}</td>
+        <td>${h.rooms || 1}</td>
         <td>${statusBadge}</td>
         <td>${h.sent || '—'}</td>
         <td>${h.reply || '—'}</td>
@@ -520,7 +524,7 @@ function render() {
         </div>
       </div>
       ${isOpen ? `<div class="card-body"><table class="hotels-table">
-        <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Status</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
+        <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Rooms</th><th>Status</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
         <tbody>${hotelsHtml}</tbody>
       </table></div>` : ''}
     </div>`;
@@ -566,6 +570,10 @@ window.addHotelBlock = function(h) {
     <div class="field"><label>Hotel / Supplier name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
     <div class="row3">
       <div class="field"><label>Check-in date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
+      <div class="field"><label>Check-out date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
+      <div class="field"><label>No. of rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
+    </div>
+    <div class="row2">
       <div class="field"><label>Status</label>
         <select class="hf-status">
           <option value="pending"${(!h||h.status==='pending')?' selected':''}>Awaiting reply</option>
@@ -623,6 +631,8 @@ window.saveBooking = async function() {
     hotels.push({
       id: block.dataset.hid, name,
       checkin: block.querySelector('.hf-checkin').value,
+      checkout: block.querySelector('.hf-checkout').value,
+      rooms: parseInt(block.querySelector('.hf-rooms').value) || 1,
       status: block.querySelector('.hf-status').value,
       sent: block.querySelector('.hf-sent').value,
       reply: block.querySelector('.hf-reply').value,
@@ -698,34 +708,48 @@ function showToast(msg) {
 /* ---------- Response Stats ---------- */
 window.renderStats = function() {
   const q = (document.getElementById('statsSearch') ? document.getElementById('statsSearch').value : '').toLowerCase();
-  const map = {}; // hotelName -> {total, count, max, min}
+  const map = {}; // hotelName -> {total, count, max, min, nights}
+  let totalNightsAll = 0;
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
-      const d = daysBetween(h.sent, h.reply);
-      if (d === null || d < 0) return;
       const key = (h.name||'Unknown').trim();
-      if (!map[key]) map[key] = { total: 0, count: 0, max: 0, min: Infinity };
+      const nights = daysBetween(h.checkin, h.checkout);
+      const rooms = h.rooms || 1;
+      const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
+      if (validNights > 0) totalNightsAll += validNights;
+
+      const d = daysBetween(h.sent, h.reply);
+      if (!map[key]) map[key] = { total: 0, count: 0, max: 0, min: Infinity, nights: 0 };
+      map[key].nights += validNights;
+      if (d === null || d < 0) return;
       map[key].total += d; map[key].count++;
       map[key].max = Math.max(map[key].max, d);
       map[key].min = Math.min(map[key].min, d);
     });
   });
-  let rows = Object.keys(map).map(name => ({ name, avg: (map[name].total/map[name].count), count: map[name].count, max: map[name].max, min: map[name].min }));
+  let rows = Object.keys(map).map(name => ({
+    name, nights: map[name].nights,
+    avg: map[name].count ? (map[name].total/map[name].count) : null,
+    count: map[name].count, max: map[name].max, min: map[name].min
+  }));
   if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
-  rows.sort((a,b) => b.avg - a.avg);
+  rows.sort((a,b) => (b.avg||0) - (a.avg||0));
 
   const wrap = document.getElementById('statsTableWrap');
-  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No response data yet — stats appear once hotels have a reply date filled in.</div>'; return; }
+  document.getElementById('totalNightsStat').textContent = totalNightsAll;
+
+  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out and reply dates filled in.</div>'; return; }
 
   wrap.innerHTML = `<div class="table-wrap" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow-x:auto">
-    <table class="hotels-table" style="min-width:600px">
-      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th></tr></thead>
+    <table class="hotels-table" style="min-width:700px">
+      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th><th>Room nights</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <td><strong>${esc(r.name)}</strong></td>
-        <td>${r.avg.toFixed(1)} days ${r.avg>=2 ? '<span class="dep-badge dep-required" style="margin-left:6px">Slow</span>' : '<span class="dep-badge dep-paid" style="margin-left:6px">Fast</span>'}</td>
-        <td>${r.min} d</td>
-        <td>${r.max} d</td>
+        <td>${r.avg!==null ? r.avg.toFixed(1) + ' days ' + (r.avg>=2 ? '<span class="dep-badge dep-required" style="margin-left:6px">Slow</span>' : '<span class="dep-badge dep-paid" style="margin-left:6px">Fast</span>') : '—'}</td>
+        <td>${r.avg!==null ? r.min + ' d' : '—'}</td>
+        <td>${r.avg!==null ? r.max + ' d' : '—'}</td>
         <td>${r.count}</td>
+        <td><strong>${r.nights}</strong></td>
       </tr>`).join('')}</tbody>
     </table>
   </div>`;
@@ -931,7 +955,7 @@ window.setSopCat = function(cat, el) {
   renderSops();
 }
 
-function renderSops() {
+window.renderSops = function renderSops() {
   const q = (document.getElementById('sopSearch') ? document.getElementById('sopSearch').value : '').toLowerCase();
   const cats = [...new Set(sops.map(s => s.category))].sort();
   const catRow = document.getElementById('sopCatRow');
