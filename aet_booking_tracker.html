@@ -184,7 +184,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     </div>
     <div class="toolbar">
       <input type="text" id="search" placeholder="Search booking, hotel, guest, agent..." oninput="render()">
-      <select id="agentFilter" onchange="render()"><option value="">All agents</option></select>
+      <select id="agentFilter" onchange="currentAgentFilter=this.value;render()"><option value="">All agents</option></select>
     </div>
     <div class="bookings" id="bookings"></div>
     <div id="empty" class="empty" style="display:none">
@@ -418,14 +418,14 @@ window.toggleCard = function(id) {
   render();
 }
 
+let currentAgentFilter = '';
 function render() {
   const q = (document.getElementById('search').value || '').toLowerCase();
-  const ag = document.getElementById('agentFilter').value;
+  const ag = currentAgentFilter;
 
   const agents = [...new Set(bookings.map(b => b.agent))].filter(Boolean).sort();
   const sel = document.getElementById('agentFilter');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a => `<option value="${a}"${a === cur ? ' selected' : ''}>${a}</option>`).join('');
+  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a => `<option value="${a}"${a === ag ? ' selected' : ''}>${a}</option>`).join('');
 
   let filtered = bookings.filter(b => {
     const hotelNames = (b.hotels||[]).map(h => h.name).join(' ');
