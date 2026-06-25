@@ -943,13 +943,15 @@ function renderCrmDetail() {
     const tripsHtml = partnerTrips.length === 0 
       ? '<div class="empty">No trips yet</div>'
       : partnerTrips.map(t => `
-        <div style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:14px">
-          <div style="font-weight:600;margin-bottom:4px">${esc(t.name)}</div>
+        <div style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:14px;cursor:pointer" onclick="openTripModal('${item.id}', '${t.id}')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div style="font-weight:600">${esc(t.name)}</div>
+            <button class="icon-btn" onclick="deleteTrip('${t.id}'); event.stopPropagation()" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
+          </div>
           <div style="font-size:12px;color:#888;margin-bottom:8px">${t.start ? new Date(t.start).toLocaleDateString() : 'No date'} - ${t.end ? new Date(t.end).toLocaleDateString() : ''}</div>
-          ${t.gdrive ? `<div style="margin-bottom:8px"><a href="${esc(t.gdrive)}" target="_blank" style="color:#1a7a55;font-size:12px"><i class="ti ti-folder"></i> Google Drive Folder</a></div>` : ''}
-          ${t.notes ? `<div style="font-size:12px;color:#555;margin-bottom:8px;white-space:pre-wrap">${esc(t.notes)}</div>` : ''}
-          <div style="font-size:11px;color:#aaa;margin-bottom:8px">Created: ${t.author} · ${t.created}</div>
-          <button class="btn sm" onclick="deleteTrip('${t.id}')" style="color:#a32d2d"><i class="ti ti-trash"></i> Delete</button>
+          ${t.gdrive ? `<div style="margin-bottom:8px"><a href="${esc(t.gdrive)}" target="_blank" onclick="event.stopPropagation()" style="color:#1a7a55;font-size:12px"><i class="ti ti-folder"></i> Google Drive</a></div>` : ''}
+          ${t.notes ? `<div style="font-size:12px;color:#555;margin-bottom:8px;white-space:pre-wrap">${esc(t.notes.substring(0, 100))}${t.notes.length > 100 ? '...' : ''}</div>` : ''}
+          <div style="font-size:11px;color:#aaa">by ${t.author} · ${t.created}</div>
         </div>
       `).join('');
     
@@ -988,35 +990,64 @@ window.deleteCrmEntity = async function() {
   window.backToCrmList();
 }
 
-window.openTripModal = function(partnerId) {
+window.openTripModal = function(partnerId, tripId) {
   document.getElementById('tripModal').classList.add('open');
-  document.getElementById('tripModalTitle').textContent = 'New Trip/Program';
-  document.getElementById('trip-name').value = '';
-  document.getElementById('trip-start').value = '';
-  document.getElementById('trip-end').value = '';
-  document.getElementById('trip-gdrive').value = '';
-  document.getElementById('trip-notes').value = '';
   document.getElementById('trip-name').dataset.partnerId = partnerId;
+  document.getElementById('trip-name').dataset.tripId = tripId || '';
+  
+  if (tripId) {
+    // Edit mode
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+    document.getElementById('tripModalTitle').textContent = 'Edit Trip/Program';
+    document.getElementById('trip-name').value = trip.name || '';
+    document.getElementById('trip-start').value = trip.start || '';
+    document.getElementById('trip-end').value = trip.end || '';
+    document.getElementById('trip-gdrive').value = trip.gdrive || '';
+    document.getElementById('trip-notes').value = trip.notes || '';
+  } else {
+    // New mode
+    document.getElementById('tripModalTitle').textContent = 'New Trip/Program';
+    document.getElementById('trip-name').value = '';
+    document.getElementById('trip-start').value = '';
+    document.getElementById('trip-end').value = '';
+    document.getElementById('trip-gdrive').value = '';
+    document.getElementById('trip-notes').value = '';
+  }
 }
 
 window.saveTrip = async function() {
   const name = document.getElementById('trip-name').value.trim();
   const partnerId = document.getElementById('trip-name').dataset.partnerId;
+  const tripId = document.getElementById('trip-name').dataset.tripId;
   if (!name) { alert('Enter trip name'); return; }
   
-  const trip = {
-    id: 't_' + Date.now(),
+  const tripData = {
     partnerId,
     name,
     start: document.getElementById('trip-start').value,
     end: document.getElementById('trip-end').value,
     gdrive: document.getElementById('trip-gdrive').value.trim(),
-    notes: document.getElementById('trip-notes').value.trim(),
-    created: new Date().toISOString().split('T')[0],
-    author: currentUser
+    notes: document.getElementById('trip-notes').value.trim()
   };
   
-  await setDoc(doc(db, 'trips', trip.id), trip);
+  if (tripId) {
+    // Update existing trip
+    const existingTrip = trips.find(t => t.id === tripId);
+    if (existingTrip) {
+      tripData.created = existingTrip.created;
+      tripData.author = existingTrip.author;
+      tripData.updated = new Date().toISOString().split('T')[0];
+    }
+    await setDoc(doc(db, 'trips', tripId), tripData);
+  } else {
+    // Create new trip
+    tripData.id = 't_' + Date.now();
+    tripData.created = new Date().toISOString().split('T')[0];
+    tripData.author = currentUser;
+    await setDoc(doc(db, 'trips', tripData.id), tripData);
+  }
+  
   window.closeModal('tripModal');
   renderCrmDetail();
 }
