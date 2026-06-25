@@ -284,6 +284,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- Trips Modal -->
+<div class="modal-bg" id="tripModal" onclick="bgClose(event,'tripModal')">
+<div class="modal">
+  <h2 id="tripModalTitle">New Trip/Program</h2>
+  <div class="field"><label>Trip Name</label><input id="trip-name" placeholder="e.g. Albatros Winter 2026/2027 Round Trip"></div>
+  <div class="row2">
+    <div class="field"><label>Start Date</label><input type="date" id="trip-start"></div>
+    <div class="field"><label>End Date</label><input type="date" id="trip-end"></div>
+  </div>
+  <div class="field"><label>Google Drive Folder Link</label><input id="trip-gdrive" placeholder="https://drive.google.com/drive/folders/..."></div>
+  <div class="field"><label>Notes (Groups, Special Info, etc.)</label><textarea id="trip-notes" placeholder="24 groups, hotel confirmations, special rates +500 THB fuel, etc." style="min-height:100px"></textarea></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('tripModal')">Cancel</button>
+    <button class="btn primary" onclick="saveTrip()">Save Trip</button>
+  </div>
+</div>
+</div>
+
 <!-- SOP Modal -->
 <div class="modal-bg" id="sopModal" onclick="bgClose(event,'sopModal')">
 <div class="modal wide">
@@ -331,6 +349,7 @@ let bookings = [];
 let partners = [];
 let hotelsCrm = [];
 let sops = [];
+let trips = [];
 
 let editId = null;
 let currentFilter = 'all';
@@ -385,6 +404,11 @@ function startApp() {
   onSnapshot(collection(db, 'sops'), (snap) => {
     sops = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderSops();
+  });
+
+  onSnapshot(collection(db, 'trips'), (snap) => {
+    trips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (currentCrmDetail && currentCrmDetail.type === 'partners') renderCrmDetail();
   });
 
   // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
@@ -871,10 +895,18 @@ function renderCrmDetail() {
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn sm" onclick='openCrmModal(${JSON.stringify(item).replace(/'/g, "&#39;")})'><i class="ti ti-edit"></i> Edit</button>
+          ${currentCrmDetail.type === 'partners' ? `<button class="btn sm" onclick="openTripModal('${item.id}')"><i class="ti ti-plus"></i> Add Trip</button>` : ''}
           <button class="btn sm" onclick="deleteCrmEntity()" style="color:#a32d2d"><i class="ti ti-trash"></i> Delete</button>
         </div>
       </div>
     </div>
+
+    ${currentCrmDetail.type === 'partners' ? `
+      <div style="margin-top:2rem;margin-bottom:2rem">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Active Trips & Programs</div>
+        <div id="trips-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
+      </div>
+    ` : ''}
 
     <div class="add-note-box">
       <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Add note</div>
@@ -904,6 +936,28 @@ function renderCrmDetail() {
       `).join('')}
     </div>
   `;
+
+  // Render trips for partners
+  if (currentCrmDetail.type === 'partners') {
+    const partnerTrips = trips.filter(t => t.partnerId === item.id);
+    const tripsHtml = partnerTrips.length === 0 
+      ? '<div class="empty">No trips yet</div>'
+      : partnerTrips.map(t => `
+        <div style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:14px">
+          <div style="font-weight:600;margin-bottom:4px">${esc(t.name)}</div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px">${t.start ? new Date(t.start).toLocaleDateString() : 'No date'} - ${t.end ? new Date(t.end).toLocaleDateString() : ''}</div>
+          ${t.gdrive ? `<div style="margin-bottom:8px"><a href="${esc(t.gdrive)}" target="_blank" style="color:#1a7a55;font-size:12px"><i class="ti ti-folder"></i> Google Drive Folder</a></div>` : ''}
+          ${t.notes ? `<div style="font-size:12px;color:#555;margin-bottom:8px;white-space:pre-wrap">${esc(t.notes)}</div>` : ''}
+          <div style="font-size:11px;color:#aaa;margin-bottom:8px">Created: ${t.author} · ${t.created}</div>
+          <button class="btn sm" onclick="deleteTrip('${t.id}')" style="color:#a32d2d"><i class="ti ti-trash"></i> Delete</button>
+        </div>
+      `).join('');
+    
+    setTimeout(() => {
+      const tripsList = document.getElementById('trips-list');
+      if (tripsList) tripsList.innerHTML = tripsHtml;
+    }, 0);
+  }
 }
 
 window.backToCrmList = function() {
@@ -932,6 +986,46 @@ window.deleteCrmEntity = async function() {
   const collectionName = currentCrmDetail.type === 'partners' ? 'partners' : 'hotelsCrm';
   await deleteDoc(doc(db, collectionName, currentCrmDetail.id));
   window.backToCrmList();
+}
+
+window.openTripModal = function(partnerId) {
+  document.getElementById('tripModal').classList.add('open');
+  document.getElementById('tripModalTitle').textContent = 'New Trip/Program';
+  document.getElementById('trip-name').value = '';
+  document.getElementById('trip-start').value = '';
+  document.getElementById('trip-end').value = '';
+  document.getElementById('trip-gdrive').value = '';
+  document.getElementById('trip-notes').value = '';
+  document.getElementById('trip-name').dataset.partnerId = partnerId;
+}
+
+window.saveTrip = async function() {
+  const name = document.getElementById('trip-name').value.trim();
+  const partnerId = document.getElementById('trip-name').dataset.partnerId;
+  if (!name) { alert('Enter trip name'); return; }
+  
+  const trip = {
+    id: 't_' + Date.now(),
+    partnerId,
+    name,
+    start: document.getElementById('trip-start').value,
+    end: document.getElementById('trip-end').value,
+    gdrive: document.getElementById('trip-gdrive').value.trim(),
+    notes: document.getElementById('trip-notes').value.trim(),
+    created: new Date().toISOString().split('T')[0],
+    author: currentUser
+  };
+  
+  await setDoc(doc(db, 'trips', trip.id), trip);
+  window.closeModal('tripModal');
+  renderCrmDetail();
+}
+
+window.deleteTrip = async function(tripId) {
+  if (confirm('Delete this trip?')) {
+    await deleteDoc(doc(db, 'trips', tripId));
+    renderCrmDetail();
+  }
 }
 
 /* ---------- SOPs ---------- */
