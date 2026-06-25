@@ -195,18 +195,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- STATS TAB -->
   <div class="tab-panel" id="panel-stats-tab">
-    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received". Room nights = days between Check-in and Check-out, multiplied by number of rooms. Based on all bookings (active + archived).</div>
+    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received". Room nights = days between Check-in and Check-out. Based on all bookings (active + archived).</div>
     <div class="stats" style="margin-bottom:1rem">
       <div class="stat"><div class="stat-label">Total room nights booked</div><div class="stat-val" id="totalNightsStat">0</div></div>
     </div>
     <div class="toolbar">
-      <select id="statsYearFilter" onchange="renderStats()" style="font-size:13px;padding:7px 11px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;height:36px;outline:none">
-        <option value="">All Years</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-        <option value="2028">2028</option>
-        <option value="2029">2029</option>
-      </select>
       <input type="text" id="statsSearch" placeholder="Search hotel name..." oninput="renderStats()">
     </div>
     <div id="statsTableWrap"></div>
@@ -241,21 +234,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- Booking Modal -->
 <div class="modal-bg" id="modal" onclick="bgClose(event,'modal')">
 <div class="modal">
-  <h2 id="modal-title">New Booking</h2>
+  <h2 id="modal-title">New booking</h2>
   <div class="row3">
-    <div class="field"><label>Booking Reference</label><input id="f-ref" placeholder="AET-2026-001"></div>
-    <div class="field"><label>Your Name (Agent)</label><input id="f-agent" placeholder="Name"></div>
-    <div class="field"><label>Guest / Group Name</label><input id="f-guest" placeholder="Guest or group name"></div>
+    <div class="field"><label>Booking ref.</label><input id="f-ref" placeholder="AET-2026-001"></div>
+    <div class="field"><label>Your name (agent)</label><input id="f-agent" placeholder="Name"></div>
+    <div class="field"><label>Guest / Group name</label><input id="f-guest" placeholder="Guest or group name"></div>
   </div>
-  <div class="field"><label>Partner (Optional)</label>
+  <div class="field"><label>Partner (optional)</label>
     <select id="f-partner"><option value="">— None —</option></select>
   </div>
   <div class="section-divider">Hotels</div>
   <div id="hotel-blocks"></div>
-  <button class="add-hotel-btn" onclick="addHotelBlock()"><i class="ti ti-plus"></i> Add Hotel</button>
+  <button class="add-hotel-btn" onclick="addHotelBlock()"><i class="ti ti-plus"></i> Add hotel</button>
   <div class="modal-footer">
     <button class="btn" onclick="closeModal('modal')">Cancel</button>
-    <button class="btn primary" onclick="saveBooking()">Save Booking</button>
+    <button class="btn primary" onclick="saveBooking()">Save booking</button>
   </div>
 </div>
 </div>
@@ -380,7 +373,8 @@ function startApp() {
     renderSops();
   });
 
-  // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
+  seedDefaultsIfEmpty();
+  // seedDefaultsIfEmpty();
 }
 
 async function seedDefaultsIfEmpty() {
@@ -574,28 +568,28 @@ window.addHotelBlock = function(h) {
     <div class="hotel-block-title">Hotel ${idx}
       <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
+    <div class="field"><label>Hotel / Supplier name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
     <div class="row3">
-      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
-      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
-      <div class="field"><label>Number of Rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
+      <div class="field"><label>Check-in date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
+      <div class="field"><label>Check-out date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
+      <div class="field"><label>No. of rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
     </div>
     <div class="row2">
       <div class="field"><label>Status</label>
         <select class="hf-status">
-          <option value="pending"${(!h||h.status==='pending')?' selected':''}>Awaiting Reply</option>
+          <option value="pending"${(!h||h.status==='pending')?' selected':''}>Awaiting reply</option>
           <option value="confirmed"${h&&h.status==='confirmed'?' selected':''}>Confirmed</option>
           <option value="cancelled"${h&&h.status==='cancelled'?' selected':''}>Cancelled</option>
         </select>
       </div>
-      <div class="field"><label>Email Sent (Date)</label><input type="date" class="hf-sent" value="${h?h.sent:today}"></div>
+      <div class="field"><label>Email sent (date)</label><input type="date" class="hf-sent" value="${h?h.sent:today}"></div>
     </div>
-    <div class="row2"><div class="field"><label>Reply Received (Date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div></div>
+    <div class="row2"><div class="field"><label>Reply received (date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div></div>
     <div class="dep-section">
       <div class="dep-section-title">Deposit / Payment</div>
       <div class="checkbox-row">
         <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDep(this,${idx})">
-        <label for="depreq-${idx}" style="cursor:pointer">Deposit / Immediate Payment Required</label>
+        <label for="depreq-${idx}" style="cursor:pointer">Deposit / immediate payment required</label>
       </div>
       <div id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
         <div class="row3" style="margin-top:8px">
@@ -610,10 +604,10 @@ window.addHotelBlock = function(h) {
             </div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}><label for="depinf-${idx}" style="cursor:pointer">Account Informed</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}><label for="depinf-${idx}" style="cursor:pointer">Account informed</label></div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}><label for="deppaid-${idx}" style="cursor:pointer">Account Paid</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}><label for="deppaid-${idx}" style="cursor:pointer">Account paid</label></div>
           </div>
         </div>
       </div>
@@ -715,8 +709,6 @@ function showToast(msg) {
 /* ---------- Response Stats ---------- */
 window.renderStats = function() {
   const q = (document.getElementById('statsSearch') ? document.getElementById('statsSearch').value : '').toLowerCase();
-  const yearFilter = document.getElementById('statsYearFilter') ? document.getElementById('statsYearFilter').value : '';
-  
   const map = {}; // hotelName -> {total, count, max, min, nights}
   let totalNightsAll = 0;
   bookings.forEach(b => {
@@ -725,13 +717,6 @@ window.renderStats = function() {
       const nights = daysBetween(h.checkin, h.checkout);
       const rooms = h.rooms || 1;
       const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
-      
-      // Filter by year if selected
-      if (yearFilter && h.checkin) {
-        const checkinYear = h.checkin.split('-')[0];
-        if (checkinYear !== yearFilter) return;
-      }
-      
       if (validNights > 0) totalNightsAll += validNights;
 
       const d = daysBetween(h.sent, h.reply);
@@ -752,14 +737,13 @@ window.renderStats = function() {
   rows.sort((a,b) => (b.avg||0) - (a.avg||0));
 
   const wrap = document.getElementById('statsTableWrap');
-  const yearLabel = yearFilter ? ` (${yearFilter})` : '';
   document.getElementById('totalNightsStat').textContent = totalNightsAll;
 
   if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out and reply dates filled in.</div>'; return; }
 
   wrap.innerHTML = `<div class="table-wrap" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow-x:auto">
     <table class="hotels-table" style="min-width:700px">
-      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th><th>Room nights${yearLabel}</th></tr></thead>
+      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th><th>Room nights</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
         <td><strong>${esc(r.name)}</strong></td>
         <td>${r.avg!==null ? r.avg.toFixed(1) + ' days ' + (r.avg>=2 ? '<span class="dep-badge dep-required" style="margin-left:6px">Slow</span>' : '<span class="dep-badge dep-paid" style="margin-left:6px">Fast</span>') : '—'}</td>
