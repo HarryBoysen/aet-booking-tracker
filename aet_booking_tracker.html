@@ -177,6 +177,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stats" id="stats"></div>
     <div class="filter-row">
       <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pre-booking',this)"><i class="ti ti-alert-circle"></i> Pre-Bookings</button>
       <button class="filter-btn" onclick="setFilter('alert',this)"><i class="ti ti-alert-circle"></i> Follow-up required</button>
       <button class="filter-btn" onclick="setFilter('deposit',this)"><i class="ti ti-credit-card"></i> Deposit pending</button>
       <button class="filter-btn" onclick="setFilter('confirmed',this)">Confirmed</button>
@@ -249,6 +250,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
   <div class="field"><label>Partner (Optional)</label>
     <select id="f-partner"><option value="">— None —</option></select>
+  </div>
+  <div class="field"><label>Booking Type</label>
+    <select id="f-booking-type">
+      <option value="pre-booking">Pre-Booking</option>
+      <option value="real-booking" selected>Real Booking</option>
+    </select>
   </div>
   <div class="section-divider">Hotels</div>
   <div id="hotel-blocks"></div>
@@ -442,7 +449,8 @@ window.render = function render() {
     if (q && !`${b.ref} ${b.guest} ${b.agent} ${hotelNames}`.toLowerCase().includes(q)) return false;
     if (ag && (b.agent||'').trim().toLowerCase() !== ag.trim().toLowerCase()) return false;
     if (currentFilter === 'archived') return !!b.archived;
-    if (b.archived) return false; // hide archived from all other views
+    if (b.archived) return false;
+    if (currentFilter === 'pre-booking') return b.booking_type === 'pre-booking';
     if (currentFilter === 'alert') return bookingHasAlert(b);
     if (currentFilter === 'deposit') return bookingHasDepositPending(b);
     if (currentFilter === 'confirmed') return (b.hotels||[]).every(h => h.status === 'confirmed');
@@ -479,6 +487,14 @@ window.render = function render() {
     const hotelCnt = (b.hotels||[]).length;
     const confirmedCount = (b.hotels||[]).filter(h => h.status === 'confirmed').length;
     const partnerLabel = b.partnerName ? `<span style="font-size:11px;color:#1a7a55;background:#eafaf2;padding:2px 8px;border-radius:20px">${esc(b.partnerName)}</span>` : '';
+    
+    // Check for 45-day pre-booking alarm
+    const preBookingAlert = b.booking_type === 'pre-booking' && (b.hotels||[]).some(h => {
+      if (!h.checkin) return false;
+      const daysUntilCheckIn = Math.floor((new Date(h.checkin) - new Date()) / 86400000);
+      return daysUntilCheckIn <= 45 && daysUntilCheckIn > 0;
+    });
+    const cardAlertClass = hasAlert || preBookingAlert ? 'has-alert' : '';
 
     const hotelsHtml = (b.hotels||[]).map(h => {
       const alert = hotelNeedsFollowup(h);
@@ -511,12 +527,14 @@ window.render = function render() {
       </tr>`;
     }).join('');
 
-    return `<div class="booking-card${hasAlert ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
+    return `<div class="booking-card${cardAlertClass ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
       <div class="card-header" onclick="toggleCard('${b.id}')">
         <div class="card-title">
           <span class="card-ref">${esc(b.ref)}</span>
           <span class="card-guest">${esc(b.guest)}</span>
           <span class="card-agent">${esc(b.agent)}</span>
+          ${b.booking_type === 'pre-booking' ? '<span style="font-size:11px;background:#fef3e2;color:#7a4a00;padding:2px 8px;border-radius:20px">Pre-Booking</span>' : ''}
+          ${preBookingAlert ? '<span style="font-size:11px;background:#fce8e8;color:#a32d2d;padding:2px 8px;border-radius:20px;margin-left:4px">⚠ 45 days</span>' : ''}
           ${partnerLabel}
           <span style="font-size:12px;color:#aaa">${confirmedCount}/${hotelCnt} confirmed</span>
           ${b.archived ? '<span class="badge b-archived">Archived</span>' : ''}
@@ -655,7 +673,8 @@ window.saveBooking = async function() {
   if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
 
   const existing = editId ? bookings.find(b=>b.id===editId) : null;
-  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, archived: existing ? !!existing.archived : false };
+  const bookingType = document.getElementById('f-booking-type').value;
+  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, booking_type: bookingType, archived: existing ? !!existing.archived : false };
   await setDoc(doc(db, 'bookings', booking.id), booking);
   window.closeModal('modal');
 }
