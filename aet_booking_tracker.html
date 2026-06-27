@@ -572,6 +572,7 @@ window.render = function render() {
           ${b.archived
             ? `<button class="icon-btn" title="Restore" onclick="restoreBooking('${b.id}')" style="color:#1a7a55"><i class="ti ti-archive-off"></i></button>`
             : `<button class="icon-btn" title="Archive" onclick="archiveBooking('${b.id}')" style="color:#aaa"><i class="ti ti-archive"></i></button>`}
+          <button class="icon-btn" title="Delete" onclick="deleteBooking('${b.id}')" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
           <i class="ti ti-chevron-down chevron ${isOpen ? 'open' : ''}"></i>
         </div>
       </div>
@@ -752,6 +753,11 @@ window.restoreBooking = async function(id) {
   const b = bookings.find(x => x.id === id); if (!b) return;
   b.archived = false;
   await setDoc(doc(db, 'bookings', id), b);
+}
+
+window.deleteBooking = async function(id) {
+  if (!confirm('Are you sure you want to delete this booking? This cannot be undone.')) return;
+  await deleteDoc(doc(db, 'bookings', id));
 }
 
 window.markHotelReplied = async function(bookingId, hotelId, e) {
