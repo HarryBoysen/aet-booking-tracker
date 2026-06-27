@@ -639,6 +639,30 @@ window.addHotelBlock = function(h) {
         <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDep(this,${idx})">
         <label for="depreq-${idx}" style="cursor:pointer">Deposit / Immediate Payment Required</label>
       </div>
+      <div class="checkbox-row" style="margin-top:6px">
+        <input type="checkbox" class="hf-cc-req" id="ccreq-${idx}" ${h&&h.creditcard&&h.creditcard.required?'checked':''} onchange="toggleCC(this,${idx})">
+        <label for="ccreq-${idx}" style="cursor:pointer">Credit Card Required</label>
+      </div>
+      <div id="cc-fields-${idx}" style="${h&&h.creditcard&&h.creditcard.required?'':'display:none'}">
+        <div class="row3" style="margin-top:8px">
+          <div class="field"><label>Amount</label>
+            <div style="display:flex;gap:6px">
+              <select class="hf-cc-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none">
+                <option value="THB"${!h||!h.creditcard||h.creditcard.currency==='THB'?' selected':''}>THB</option>
+                <option value="USD"${h&&h.creditcard&&h.creditcard.currency==='USD'?' selected':''}>USD</option>
+                <option value="IDR"${h&&h.creditcard&&h.creditcard.currency==='IDR'?' selected':''}>IDR</option>
+              </select>
+              <input type="number" class="hf-cc-amount" placeholder="e.g. 5000" value="${h&&h.creditcard?h.creditcard.amount:''}" style="flex:1">
+            </div>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-informed" id="ccinf-${idx}" ${h&&h.creditcard&&h.creditcard.informed?'checked':''}><label for="ccinf-${idx}" style="cursor:pointer">Account Informed</label></div>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-paid" id="ccpaid-${idx}" ${h&&h.creditcard&&h.creditcard.paid?'checked':''}><label for="ccpaid-${idx}" style="cursor:pointer">Account Paid</label></div>
+          </div>
+        </div>
+      </div>
       <div id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
         <div class="row3" style="margin-top:8px">
           <div class="field"><label>Amount</label>
@@ -659,10 +683,12 @@ window.addHotelBlock = function(h) {
           </div>
         </div>
       </div>
+      <div class="field" style="margin-top:10px"><label>Payment / Deposit Note</label><textarea class="hf-dep-note" placeholder="e.g. Special terms, payment plan, credit card brand required..." style="min-height:60px;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px">${h&&h.depositNote?h.depositNote:''}</textarea></div>
     </div>`;
   document.getElementById('hotel-blocks').appendChild(div);
 }
 window.toggleDep = function(cb, idx) { document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
+window.toggleCC = function(cb, idx) { document.getElementById('cc-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
 
 window.saveBooking = async function() {
   const ref = document.getElementById('f-ref').value.trim();
@@ -677,6 +703,7 @@ window.saveBooking = async function() {
     const name = block.querySelector('.hf-name').value.trim();
     if (!name) return;
     const depReq = block.querySelector('.hf-dep-req').checked;
+    const ccReq = block.querySelector('.hf-cc-req').checked;
     hotels.push({
       id: block.dataset.hid, name,
       checkin: block.querySelector('.hf-checkin').value,
@@ -691,7 +718,15 @@ window.saveBooking = async function() {
         amount: depReq ? block.querySelector('.hf-dep-amount').value.trim() : '',
         informed: depReq ? block.querySelector('.hf-dep-informed').checked : false,
         paid: depReq ? block.querySelector('.hf-dep-paid').checked : false,
-      }
+      },
+      creditcard: {
+        required: ccReq,
+        currency: ccReq ? block.querySelector('.hf-cc-currency').value : 'THB',
+        amount: ccReq ? block.querySelector('.hf-cc-amount').value.trim() : '',
+        informed: ccReq ? block.querySelector('.hf-cc-informed').checked : false,
+        paid: ccReq ? block.querySelector('.hf-cc-paid').checked : false,
+      },
+      depositNote: block.querySelector('.hf-dep-note').value.trim()
     });
   });
   if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
