@@ -180,6 +180,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="filter-btn" onclick="setFilter('pre-booking',this)"><i class="ti ti-alert-circle"></i> Pre-Bookings</button>
       <button class="filter-btn" onclick="setFilter('alert',this)"><i class="ti ti-alert-circle"></i> Follow-up required</button>
       <button class="filter-btn" onclick="setFilter('deposit',this)"><i class="ti ti-credit-card"></i> Deposit pending</button>
+      <button class="filter-btn" onclick="setFilter('creditcard',this)"><i class="ti ti-credit-card"></i> Credit card pending</button>
       <button class="filter-btn" onclick="setFilter('confirmed',this)">Confirmed</button>
       <button class="filter-btn" onclick="setFilter('archived',this)"><i class="ti ti-archive"></i> Archived</button>
     </div>
@@ -445,6 +446,7 @@ function daysBetween(a,b) { if(!a||!b) return null; return Math.floor((new Date(
 function hotelNeedsFollowup(h) { return h.status === 'pending' && !h.reply && daysSince(h.sent) >= 2; }
 function bookingHasAlert(b) { return !b.archived && (b.hotels||[]).some(hotelNeedsFollowup); }
 function bookingHasDepositPending(b) { return !b.archived && (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
+function bookingHasCreditCardPending(b) { return !b.archived && (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Bookings render ---------- */
@@ -477,6 +479,7 @@ window.render = function render() {
     if (currentFilter === 'pre-booking') return b.booking_type === 'pre-booking';
     if (currentFilter === 'alert') return bookingHasAlert(b);
     if (currentFilter === 'deposit') return bookingHasDepositPending(b);
+    if (currentFilter === 'creditcard') return bookingHasCreditCardPending(b);
     if (currentFilter === 'confirmed') return (b.hotels||[]).every(h => h.status === 'confirmed');
     return true;
   });
