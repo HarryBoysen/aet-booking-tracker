@@ -9,337 +9,124 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;min-height:100vh}
 
-/* Password Login */
+/* Login */
 .login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a7a55 0%,#0f5a3d 100%);display:flex;align-items:center;justify-content:center;z-index:9999}
 .login-box{background:#fff;border-radius:16px;padding:3rem;width:min(400px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
-.login-box h1{font-size:28px;margin-bottom:8px;color:#1a1a1a}
-.login-box p{font-size:14px;color:#666;margin-bottom:2rem;line-height:1.6}
+.login-box h1{font-size:28px;margin-bottom:8px}
+.login-box p{font-size:14px;color:#666;margin-bottom:2rem}
 .login-logo{font-size:56px;margin-bottom:1.5rem}
 .login-input{width:100%;padding:12px 14px;font-size:15px;border:1px solid #ddd;border-radius:8px;margin-bottom:1rem;outline:none}
 .login-input:focus{border-color:#1a7a55;box-shadow:0 0 0 3px rgba(26,122,85,0.1)}
-.login-btn{width:100%;padding:12px 16px;background:#1a7a55;border:none;border-radius:8px;font-size:15px;font-weight:600;color:#fff;cursor:pointer;transition:all 0.2s}
+.login-btn{width:100%;padding:12px 16px;background:#1a7a55;border:none;border-radius:8px;font-size:15px;font-weight:600;color:#fff;cursor:pointer}
 .login-btn:hover{background:#145e41}
 .login-box .footer{margin-top:2rem;padding-top:1.5rem;border-top:0.5px solid #eee;font-size:12px;color:#999}
 .error{color:#d32f2f;font-size:13px;margin-top:8px;display:none}
-.page-wrapper{display:none}
-.page-wrapper.active{display:block}
+.app-wrapper{display:none}
+.app-wrapper.active{display:block}
 
 .page{max-width:1200px;margin:0 auto;padding:1.5rem}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem}
 .stat{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;padding:14px 16px}
 .stat-label{font-size:12px;color:#888;margin-bottom:4px}
 .stat-val{font-size:24px;font-weight:600}
-.stat-val.red{color:#a32d2d}.stat-val.amber{color:#7a4a00}.stat-val.green{color:#2d6e2d}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
-.toolbar input,.toolbar select{font-size:13px;padding:7px 11px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;height:36px;outline:none}
-.toolbar input{flex:1;min-width:160px}
-.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 14px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer;height:36px;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;padding:7px 14px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;cursor:pointer;height:36px}
 .btn:hover{background:#f0f0ee}
 .btn.primary{background:#1a7a55;border-color:#1a7a55;color:#fff}
-.btn.primary:hover{background:#145e41}
-.btn.sm{height:30px;font-size:12px;padding:5px 11px}
-.filter-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
-.filter-btn{font-size:12px;padding:5px 13px;border:0.5px solid #ddd;border-radius:20px;background:#fff;color:#666;cursor:pointer}
-.filter-btn:hover{background:#f0f0ee}
-.filter-btn.active{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
-
-/* Top nav tabs */
-.top-tabs{display:flex;gap:4px;margin-bottom:1.25rem;border-bottom:0.5px solid #e0e0dc;padding-bottom:0}
-.top-tab{font-size:13px;font-weight:500;color:#888;padding:10px 16px;cursor:pointer;border-bottom:2px solid transparent;display:flex;align-items:center;gap:6px}
-.top-tab:hover{color:#1a1a1a}
-.top-tab.active{color:#1a7a55;border-bottom-color:#1a7a55}
-.tab-panel{display:none}
-.tab-panel.active{display:block}
-
-/* Booking cards */
-.bookings{display:flex;flex-direction:column;gap:12px}
-.booking-card{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow:hidden}
-.booking-card.has-alert{border-left:3px solid #c0392b}
-.booking-card.is-archived{opacity:0.6}
-.card-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;cursor:pointer;gap:12px;flex-wrap:wrap}
-.card-header:hover{background:#fafaf8}
-.card-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.card-ref{font-weight:600;font-size:15px}
-.card-guest{font-size:13px;color:#666}
-.card-agent{font-size:12px;background:#f0f0ee;padding:2px 9px;border-radius:20px}
-.card-actions{display:flex;gap:6px;align-items:center}
-.icon-btn{background:transparent;border:none;cursor:pointer;color:#999;font-size:16px;padding:4px 6px;border-radius:5px;display:inline-flex;align-items:center}
-.icon-btn:hover{color:#1a1a1a;background:#f0f0ee}
-.card-body{border-top:0.5px solid #f0f0ec}
-.hotels-table{width:100%;border-collapse:collapse;font-size:13px}
-.hotels-table th{padding:8px 14px;text-align:left;font-weight:500;color:#888;font-size:11px;background:#fafaf8;border-bottom:0.5px solid #f0f0ec;white-space:nowrap}
-.hotels-table td{padding:9px 14px;border-bottom:0.5px solid #f5f5f3;vertical-align:middle}
-.hotels-table tr:last-child td{border-bottom:none}
-.hotels-table tr:hover td{background:#fafaf8}
-.hotel-alert td{background:#fff8f8}
-.badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
-.b-pending{background:#fef3e2;color:#7a4a00}
-.b-alert{background:#fce8e8;color:#a32d2d}
-.b-confirmed{background:#e8f5e9;color:#2d6e2d}
-.b-cancelled{background:#f0f0ee;color:#666}
-.b-archived{background:#eee;color:#888}
-.dep-badge{font-size:11px;padding:2px 7px;border-radius:20px;white-space:nowrap}
-.dep-required{background:#fef3e2;color:#7a4a00}
-.dep-paid{background:#e8f5e9;color:#2d6e2d}
-.dep-none{color:#ccc;font-size:11px}
-.days-warn{color:#a32d2d;font-weight:600}
-.days-ok{color:#aaa}
+.btn.danger{background:#d32f2f;border-color:#d32f2f;color:#fff}
 .empty{text-align:center;padding:3rem;color:#999;font-size:13px}
-.chevron{transition:transform 0.2s;font-size:18px;color:#ccc}
-.chevron.open{transform:rotate(180deg)}
-
-/* Modal */
-.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
-.modal-bg.open{display:flex}
-.modal{background:#fff;border-radius:14px;border:0.5px solid #ddd;padding:1.75rem;width:min(680px,96vw);margin:auto}
-.modal.wide{width:min(820px,96vw)}
-.modal h2{font-size:17px;font-weight:600;margin-bottom:1.25rem}
-.field{margin-bottom:12px}
-.field label{display:block;font-size:12px;color:#666;margin-bottom:4px;font-weight:500}
-.field input,.field select,.field textarea{width:100%;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;outline:none;font-family:inherit}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:#888}
-.field textarea{resize:vertical;min-height:70px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
-.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:0.5px solid #eee}
-.hotel-block{background:#f9f9f7;border:0.5px solid #e8e8e4;border-radius:10px;padding:14px;margin-bottom:10px;position:relative}
-.hotel-block-title{font-size:12px;font-weight:600;color:#888;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
-.dep-section{margin-top:10px;padding-top:10px;border-top:0.5px solid #e8e8e4}
-.dep-section-title{font-size:11px;font-weight:600;color:#aaa;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em}
-.checkbox-row{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px}
-.checkbox-row input[type=checkbox]{width:16px;height:16px;cursor:pointer}
-.add-hotel-btn{display:flex;align-items:center;gap:6px;font-size:13px;color:#1a7a55;background:none;border:0.5px dashed #1a7a55;border-radius:8px;padding:8px 14px;cursor:pointer;width:100%;justify-content:center;margin-top:4px}
-.add-hotel-btn:hover{background:#f0faf5}
-.section-divider{font-size:12px;font-weight:600;color:#aaa;margin:16px 0 10px;text-transform:uppercase;letter-spacing:0.05em}
-.name-screen{position:fixed;inset:0;background:#f5f5f3;display:flex;align-items:center;justify-content:center;z-index:500}
-.name-box{background:#fff;border-radius:16px;border:0.5px solid #e0e0dc;padding:2rem;width:min(400px,90vw);text-align:center}
-.name-box h2{font-size:20px;font-weight:600;margin-bottom:8px}
-.name-box p{font-size:13px;color:#888;margin-bottom:1.5rem}
-.name-box input{width:100%;padding:10px 14px;font-size:15px;border:0.5px solid #ccc;border-radius:8px;outline:none;margin-bottom:12px;text-align:center}
-.loading{position:fixed;inset:0;background:#f5f5f3;display:flex;align-items:center;justify-content:center;z-index:400;font-size:14px;color:#888;gap:10px}
-@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
-
-/* CRM cards (partners/hotels) */
-.crm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
-.crm-card{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:16px;cursor:pointer}
-.crm-card:hover{border-color:#1a7a55;box-shadow:0 1px 6px rgba(0,0,0,0.05)}
-.crm-card-name{font-weight:600;font-size:15px;margin-bottom:4px}
-.crm-card-meta{font-size:12px;color:#888;margin-bottom:8px}
-.crm-card-notecount{font-size:11px;color:#1a7a55;background:#eafaf2;padding:2px 8px;border-radius:20px;display:inline-block}
-.add-crm-card{display:flex;align-items:center;justify-content:center;gap:6px;border:0.5px dashed #ccc;border-radius:12px;color:#888;cursor:pointer;font-size:13px;min-height:90px}
-.add-crm-card:hover{border-color:#1a7a55;color:#1a7a55;background:#f0faf5}
-
-/* Detail panel */
-.detail-back{font-size:13px;color:#1a7a55;cursor:pointer;margin-bottom:1rem;display:inline-flex;align-items:center;gap:4px}
-.detail-header{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:18px 20px;margin-bottom:1rem}
-.detail-name{font-size:18px;font-weight:600;margin-bottom:4px}
-.detail-meta-row{display:flex;gap:16px;flex-wrap:wrap;font-size:13px;color:#666;margin-top:8px}
-.detail-meta-row span{display:flex;align-items:center;gap:5px}
-.note-list{display:flex;flex-direction:column;gap:10px}
-.note-card{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;padding:14px 16px}
-.note-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px}
-.note-author{font-weight:600;font-size:13px}
-.note-date{font-size:12px;color:#999}
-.note-tag{font-size:11px;background:#eef2ff;color:#3b4ba0;padding:2px 8px;border-radius:20px;margin-left:6px}
-.note-text{font-size:13px;color:#333;white-space:pre-wrap;line-height:1.5}
-.add-note-box{background:#fafaf8;border:0.5px solid #e8e8e4;border-radius:10px;padding:14px 16px;margin-bottom:1rem}
-
-/* SOP playbook */
-.sop-cat-row{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem}
-.sop-list{display:flex;flex-direction:column;gap:10px}
-.sop-card{background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow:hidden}
-.sop-card-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;cursor:pointer;gap:10px}
-.sop-card-header:hover{background:#fafaf8}
-.sop-title{font-weight:600;font-size:14px}
-.sop-cat-badge{font-size:11px;background:#f0f0ee;color:#555;padding:2px 9px;border-radius:20px;margin-left:8px}
-.sop-body{border-top:0.5px solid #f0f0ec;padding:14px 18px;font-size:13px;color:#333;white-space:pre-wrap;line-height:1.6}
-.sop-meta{font-size:11px;color:#aaa;margin-top:10px}
 </style>
 </head>
 <body>
 
-<!-- PASSWORD LOGIN SCREEN -->
+<!-- LOGIN SCREEN -->
 <div id="loginScreen" class="login-screen">
   <div class="login-box">
     <div class="login-logo">🔐</div>
     <h1>AET Booking Tracker</h1>
-    <p>Enter the access code to continue. Team members can work from anywhere in the world.</p>
+    <p>Enter the access code to continue.</p>
     <input type="password" id="passwordInput" class="login-input" placeholder="Enter access code..." autofocus>
     <button class="login-btn" onclick="checkPassword()">Sign In</button>
-    <div class="error" id="errorMsg">Incorrect access code. Please try again.</div>
-    <div class="footer">Your data is secure. Only authorized team members can access the tracker.</div>
+    <div class="error" id="errorMsg">Incorrect code. Try again.</div>
+    <div class="footer">Only authorized team members can access.</div>
   </div>
 </div>
 
-<!-- MAIN APP WRAPPER -->
-<div class="page-wrapper" id="pageWrapper">
-
-<div class="loading" id="loading"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:20px"></i> Connecting...</div>
-
-<div class="name-screen" id="nameScreen" style="display:none">
-  <div class="name-box">
-    <h2>Welcome to AET Booking Tracker</h2>
-    <p>Enter your name to get started. This will be shown on your bookings and notes.</p>
-    <input type="text" id="nameInput" placeholder="Your name" maxlength="30">
-    <button class="btn primary" style="width:100%;justify-content:center;height:42px;font-size:14px" onclick="saveName()">Start</button>
-  </div>
-</div>
-
-<div class="page" id="mainApp" style="display:none">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
-    <div>
-      <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
-      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="changeName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(change)</button> &nbsp;·&nbsp; <button onclick="logout()" style="background:none;border:none;color:#d32f2f;cursor:pointer;font-size:12px;font-weight:500">Sign Out</button></div>
-    </div>
-  </div>
-
-  <div class="top-tabs">
-    <div class="top-tab active" data-tab="bookings" onclick="switchTab('bookings')"><i class="ti ti-calendar-event"></i> Bookings</div>
-    <div class="top-tab" data-tab="stats" onclick="switchTab('stats-tab')"><i class="ti ti-chart-bar"></i> Response Stats</div>
-    <div class="top-tab" data-tab="crm" onclick="switchTab('crm')"><i class="ti ti-users"></i> Partners &amp; Hotels</div>
-    <div class="top-tab" data-tab="sop" onclick="switchTab('sop')"><i class="ti ti-book"></i> Playbook / SOPs</div>
-  </div>
-
-  <!-- BOOKINGS TAB -->
-  <div class="tab-panel active" id="panel-bookings">
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:1rem">
-      <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
-      <button class="btn primary" onclick="openModal()"><i class="ti ti-plus"></i> New booking</button>
-    </div>
-    <div class="stats" id="stats"></div>
-    <div class="filter-row">
-      <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
-      <button class="filter-btn" onclick="setFilter('alert',this)"><i class="ti ti-alert-circle"></i> Follow-up required</button>
-      <button class="filter-btn" onclick="setFilter('deposit',this)"><i class="ti ti-credit-card"></i> Deposit pending</button>
-      <button class="filter-btn" onclick="setFilter('confirmed',this)">Confirmed</button>
-      <button class="filter-btn" onclick="setFilter('archived',this)"><i class="ti ti-archive"></i> Archived</button>
-    </div>
-    <div class="toolbar">
-      <input type="text" id="search" placeholder="Search booking, hotel, guest, agent..." oninput="render()">
-      <select id="agentFilter" onchange="currentAgentFilter=this.value;render()"><option value="">All agents</option></select>
-    </div>
-    <div class="bookings" id="bookings"></div>
-    <div id="empty" class="empty" style="display:none">
-      <i class="ti ti-inbox" style="font-size:28px;display:block;margin-bottom:8px"></i>
-      No bookings match your filter
-    </div>
-  </div>
-
-  <!-- STATS TAB -->
-  <div class="tab-panel" id="panel-stats-tab">
-    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received". Room nights = days between Check-in and Check-out, multiplied by number of rooms. Based on all bookings (active + archived).</div>
-    <div class="stats" style="margin-bottom:1rem">
-      <div class="stat"><div class="stat-label">Total room nights booked</div><div class="stat-val" id="totalNightsStat">0</div></div>
-    </div>
-    <div class="toolbar">
-      <select id="statsYearFilter" onchange="renderStats()" style="font-size:13px;padding:7px 11px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;height:36px;outline:none">
-        <option value="">All Years</option>
-        <option value="2026">2026</option>
-        <option value="2027">2027</option>
-        <option value="2028">2028</option>
-        <option value="2029">2029</option>
-      </select>
-      <input type="text" id="statsSearch" placeholder="Search hotel name..." oninput="renderStats()">
-    </div>
-    <div id="statsTableWrap"></div>
-  </div>
-
-  <!-- CRM TAB -->
-  <div class="tab-panel" id="panel-crm">
-    <div id="crmListView">
-      <div class="filter-row">
-        <button class="filter-btn active" onclick="setCrmType('partners',this)">Partners</button>
-        <button class="filter-btn" onclick="setCrmType('hotels',this)">Hotels</button>
+<!-- APP -->
+<div class="app-wrapper" id="appWrapper">
+  <div class="page">
+    <div style="display:flex;justify-content:space-between;margin-bottom:2rem">
+      <div>
+        <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
+        <div style="font-size:13px;color:#666;margin-top:4px">Asia Evolution Tour</div>
       </div>
-      <div class="crm-grid" id="crmGrid"></div>
+      <button class="btn danger" onclick="logout()"><i class="ti ti-logout"></i> Sign Out</button>
     </div>
-    <div id="crmDetailView" style="display:none"></div>
-  </div>
-
-  <!-- SOP TAB -->
-  <div class="tab-panel" id="panel-sop">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
-      <button class="btn primary" onclick="openSopModal()"><i class="ti ti-plus"></i> New SOP</button>
-    </div>
-    <div class="toolbar">
-      <input type="text" id="sopSearch" placeholder="Search SOPs..." oninput="renderSops()">
-    </div>
-    <div class="sop-cat-row" id="sopCatRow"></div>
-    <div class="sop-list" id="sopList"></div>
-    <div id="sopEmpty" class="empty" style="display:none">No SOPs yet — add the first one!</div>
-  </div>
-</div>
-
-<!-- Booking Modal -->
-<div class="modal-bg" id="modal" onclick="bgClose(event,'modal')">
-<div class="modal">
-  <h2 id="modal-title">New Booking</h2>
-  <div class="row3">
-    <div class="field"><label>Booking Reference</label><input id="f-ref" placeholder="AET-2026-001"></div>
-    <div class="field"><label>Your Name (Agent)</label><input id="f-agent" placeholder="Name"></div>
-    <div class="field"><label>Guest / Group Name</label><input id="f-guest" placeholder="Guest or group name"></div>
-  </div>
-  <div class="field"><label>Partner (Optional)</label>
-    <select id="f-partner"><option value="">— None —</option></select>
-  </div>
-  <div class="section-divider">Hotels</div>
-  <div id="hotel-blocks"></div>
-  <button class="add-hotel-btn" onclick="addHotelBlock()"><i class="ti ti-plus"></i> Add Hotel</button>
-  <div class="modal-footer">
-    <button class="btn" onclick="closeModal('modal')">Cancel</button>
-    <button class="btn primary" onclick="saveBooking()">Save Booking</button>
-  </div>
-</div>
-</div>
-
-<!-- CRM entity Modal (add/edit partner or hotel) -->
-<div class="modal-bg" id="crmModal" onclick="bgClose(event,'crmModal')">
-<div class="modal">
-  <h2 id="crmModalTitle">New partner</h2>
-  <div class="field"><label>Name</label><input id="crm-name" placeholder="e.g. Albatros Travel"></div>
-  <div class="row2">
-    <div class="field"><label>Main contact person(s)</label><input id="crm-contact" placeholder="e.g. Lha, Kong"></div>
-    <div class="field"><label>Email / Phone</label><input id="crm-emailphone" placeholder="e.g. lha@exo.com"></div>
-  </div>
-  <div class="field"><label>General info</label><textarea id="crm-info" placeholder="Location, agreed rates, contract terms, etc."></textarea></div>
-  <div class="modal-footer">
-    <button class="btn" onclick="closeModal('crmModal')">Cancel</button>
-    <button class="btn primary" onclick="saveCrmEntity()">Save</button>
-  </div>
-</div>
-</div>
-
-<!-- SOP Modal -->
-<div class="modal-bg" id="sopModal" onclick="bgClose(event,'sopModal')">
-<div class="modal wide">
-  <h2 id="sopModalTitle">New SOP</h2>
-  <div class="row2">
-    <div class="field"><label>Title</label><input id="sop-title" placeholder="e.g. Hotel on stop sale / full"></div>
-    <div class="field"><label>Category</label>
-      <select id="sop-category">
-        <option value="Hotel issues">Hotel issues</option>
-        <option value="Payment">Payment</option>
-        <option value="Visa / documents">Visa / documents</option>
-        <option value="Transport">Transport</option>
-        <option value="Vouchers">Vouchers</option>
-        <option value="General">General</option>
-        <option value="__new">+ New category...</option>
-      </select>
+    
+    <div style="text-align:center;padding:3rem;color:#666">
+      <p>✅ Access granted!</p>
+      <p style="margin-top:1rem;font-size:13px">Full tracker loading...</p>
     </div>
   </div>
-  <div class="field" id="sop-newcat-field" style="display:none"><label>New category name</label><input id="sop-newcat"></div>
-  <div class="field"><label>Steps / Content</label><textarea id="sop-content" style="min-height:180px" placeholder="1) Step one...&#10;2) Step two...&#10;3) ..."></textarea></div>
-  <div class="modal-footer">
-    <button class="btn" onclick="closeModal('sopModal')">Cancel</button>
-    <button class="btn primary" onclick="saveSop()">Save SOP</button>
-  </div>
-</div>
 </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
+<script>
+// Password check
+const CORRECT_PASSWORD = 'AET2024';
+const SESSION_KEY = 'aet_session';
+
+window.checkPassword = function() {
+  const input = document.getElementById('passwordInput').value;
+  const errorMsg = document.getElementById('errorMsg');
+  
+  if (input === CORRECT_PASSWORD) {
+    sessionStorage.setItem(SESSION_KEY, 'true');
+    errorMsg.style.display = 'none';
+    showApp();
+  } else {
+    errorMsg.style.display = 'block';
+    document.getElementById('passwordInput').value = '';
+  }
+}
+
+window.logout = function() {
+  if (confirm('Sign out?')) {
+    sessionStorage.removeItem(SESSION_KEY);
+    showLogin();
+  }
+}
+
+function showApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('appWrapper').classList.add('active');
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('appWrapper').classList.remove('active');
+  document.getElementById('passwordInput').focus();
+}
+
+// Check session on load
+window.addEventListener('load', () => {
+  if (sessionStorage.getItem(SESSION_KEY)) {
+    showApp();
+  } else {
+    showLogin();
+  }
+});
+
+// Enter key
+document.addEventListener('keypress', (e) => {
+  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
+    checkPassword();
+  }
+});
+
+// Firebase
 const firebaseConfig = {
   apiKey: "AIzaSyAIOaGt05ggJD9mcAa96OymC8_U55O6xQU",
   authDomain: "aet-booking-tracker.firebaseapp.com",
@@ -349,759 +136,10 @@ const firebaseConfig = {
   appId: "1:750269064961:web:814ef3573a9a01dfc2dd00"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
-let bookings = [];
-let partners = [];
-let hotelsCrm = [];
-let sops = [];
-
-let editId = null;
-let currentFilter = 'all';
-let expandedCards = new Set();
-let currentUser = localStorage.getItem('aet_username') || '';
-let hotelCount = 0;
-let crmType = 'partners'; // 'partners' | 'hotels'
-let currentCrmDetail = null; // {type, id}
-let editingCrmId = null;
-let editingSopId = null;
-let sopCategoryFilter = '';
-
-document.getElementById('loading').style.display = 'none';
-if (!currentUser) {
-  document.getElementById('nameScreen').style.display = 'flex';
-} else {
-  startApp();
-}
-
-window.saveName = function() {
-  const name = document.getElementById('nameInput').value.trim();
-  if (!name) { alert('Please enter your name.'); return; }
-  localStorage.setItem('aet_username', name);
-  currentUser = name;
-  document.getElementById('nameScreen').style.display = 'none';
-  startApp();
-}
-window.changeName = function() { localStorage.removeItem('aet_username'); location.reload(); }
-document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') window.saveName(); });
-
-function startApp() {
-  document.getElementById('mainApp').style.display = 'block';
-  document.getElementById('currentUserLabel').textContent = currentUser;
-  document.getElementById('f-agent').value = currentUser;
-
-  onSnapshot(collection(db, 'bookings'), (snap) => {
-    bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    render();
-    renderStats();
-  });
-  onSnapshot(collection(db, 'partners'), (snap) => {
-    partners = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderCrm();
-    refreshPartnerDropdown();
-    if (currentCrmDetail && currentCrmDetail.type === 'partners') renderCrmDetail();
-  });
-  onSnapshot(collection(db, 'hotelsCrm'), (snap) => {
-    hotelsCrm = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderCrm();
-    if (currentCrmDetail && currentCrmDetail.type === 'hotels') renderCrmDetail();
-  });
-  onSnapshot(collection(db, 'sops'), (snap) => {
-    sops = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderSops();
-  });
-
-  // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
-}
-
-async function seedDefaultsIfEmpty() {
-  setTimeout(async () => {
-    if (partners.length === 0) {
-      const defaults = ['Albatros Travel', 'Unique Travel', 'Dan Explorer', 'Asian Trails'];
-      for (const name of defaults) {
-        await setDoc(doc(db, 'partners', 'p_' + name.toLowerCase().replace(/\s+/g,'_')), {
-          name, contact: '', emailphone: '', info: '', notes: []
-        });
-      }
-    }
-  }, 1500);
-}
-
-/* ---------- Tabs ---------- */
-window.switchTab = function(tab) {
-  document.querySelectorAll('.top-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  const tabKey = tab === 'stats-tab' ? 'stats' : tab;
-  document.querySelector(`.top-tab[data-tab="${tabKey}"]`).classList.add('active');
-  document.getElementById('panel-' + tab).classList.add('active');
-  if (tab === 'crm') { currentCrmDetail = null; document.getElementById('crmListView').style.display='block'; document.getElementById('crmDetailView').style.display='none'; renderCrm(); }
-  if (tab === 'sop') renderSops();
-  if (tab === 'stats-tab') renderStats();
-}
-
-/* ---------- Helpers ---------- */
-function daysSince(dateStr) { if (!dateStr) return null; return Math.floor((new Date() - new Date(dateStr)) / 86400000); }
-function daysBetween(a,b) { if(!a||!b) return null; return Math.floor((new Date(b) - new Date(a)) / 86400000); }
-function hotelNeedsFollowup(h) { return h.status === 'pending' && !h.reply && daysSince(h.sent) >= 2; }
-function bookingHasAlert(b) { return !b.archived && (b.hotels||[]).some(hotelNeedsFollowup); }
-function bookingHasDepositPending(b) { return !b.archived && (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
-function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
-/* ---------- Bookings render ---------- */
-window.setFilter = function(f, el) {
-  currentFilter = f;
-  document.querySelectorAll('#panel-bookings .filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  render();
-}
-window.toggleCard = function(id) {
-  if (expandedCards.has(id)) expandedCards.delete(id); else expandedCards.add(id);
-  render();
-}
-
-window.currentAgentFilter = '';
-window.render = function render() {
-  const q = (document.getElementById('search').value || '').toLowerCase();
-  const ag = window.currentAgentFilter;
-
-  const agents = [...new Set(bookings.map(b => (b.agent||'').trim()))].filter(Boolean).sort();
-  const sel = document.getElementById('agentFilter');
-  sel.innerHTML = '<option value="">All agents</option>' + agents.map(a => `<option value="${esc(a)}"${a === ag.trim() ? ' selected' : ''}>${esc(a)}</option>`).join('');
-
-  let filtered = bookings.filter(b => {
-    const hotelNames = (b.hotels||[]).map(h => h.name).join(' ');
-    if (q && !`${b.ref} ${b.guest} ${b.agent} ${hotelNames}`.toLowerCase().includes(q)) return false;
-    if (ag && (b.agent||'').trim().toLowerCase() !== ag.trim().toLowerCase()) return false;
-    if (currentFilter === 'archived') return !!b.archived;
-    if (b.archived) return false; // hide archived from all other views
-    if (currentFilter === 'alert') return bookingHasAlert(b);
-    if (currentFilter === 'deposit') return bookingHasDepositPending(b);
-    if (currentFilter === 'confirmed') return (b.hotels||[]).every(h => h.status === 'confirmed');
-    return true;
-  });
-
-  filtered.sort((a, b) => { const af = bookingHasAlert(a), bf = bookingHasAlert(b); if (af && !bf) return -1; if (!af && bf) return 1; return 0; });
-
-  const activeB = bookings.filter(b => !b.archived);
-  const totalHotels = activeB.reduce((s, b) => s + (b.hotels||[]).length, 0);
-  const alertCount = activeB.reduce((s, b) => s + (b.hotels||[]).filter(hotelNeedsFollowup).length, 0);
-  const depPending = activeB.reduce((s, b) => s + (b.hotels||[]).filter(h => h.deposit && h.deposit.required && !h.deposit.paid).length, 0);
-  const confirmed = activeB.reduce((s, b) => s + (b.hotels||[]).filter(h => h.status === 'confirmed').length, 0);
-  const archivedCount = bookings.filter(b => b.archived).length;
-
-  document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-label">Active bookings</div><div class="stat-val">${activeB.length}</div></div>
-    <div class="stat"><div class="stat-label">Total hotels</div><div class="stat-val">${totalHotels}</div></div>
-    <div class="stat"><div class="stat-label">Follow-up required</div><div class="stat-val red">${alertCount}</div></div>
-    <div class="stat"><div class="stat-label">Deposit pending</div><div class="stat-val amber">${depPending}</div></div>
-    <div class="stat"><div class="stat-label">Hotels confirmed</div><div class="stat-val green">${confirmed}</div></div>
-    <div class="stat"><div class="stat-label">Archived</div><div class="stat-val">${archivedCount}</div></div>
-  `;
-
-  const container = document.getElementById('bookings');
-  if (filtered.length === 0) { container.innerHTML = ''; document.getElementById('empty').style.display = 'block'; return; }
-  document.getElementById('empty').style.display = 'none';
-
-  bookings.filter(bookingHasAlert).forEach(b => expandedCards.add(b.id));
-
-  container.innerHTML = filtered.map(b => {
-    const hasAlert = bookingHasAlert(b);
-    const isOpen = expandedCards.has(b.id);
-    const hotelCnt = (b.hotels||[]).length;
-    const confirmedCount = (b.hotels||[]).filter(h => h.status === 'confirmed').length;
-    const partnerLabel = b.partnerName ? `<span style="font-size:11px;color:#1a7a55;background:#eafaf2;padding:2px 8px;border-radius:20px">${esc(b.partnerName)}</span>` : '';
-
-    const hotelsHtml = (b.hotels||[]).map(h => {
-      const alert = hotelNeedsFollowup(h);
-      const days = daysSince(h.sent);
-      const daysCell = h.sent ? (alert ? `<span class="days-warn">${days}d ⚠</span>` : `<span class="days-ok">${days}d</span>`) : '—';
-      const statusBadge = alert ? `<span class="badge b-alert">Follow up!</span>`
-        : h.status === 'confirmed' ? `<span class="badge b-confirmed">Confirmed</span>`
-        : h.status === 'cancelled' ? `<span class="badge b-cancelled">Cancelled</span>`
-        : `<span class="badge b-pending">Awaiting</span>`;
-      const cur = (h.deposit && h.deposit.currency) || 'THB';
-      let depHtml = '';
-      if (h.deposit && h.deposit.required) {
-        if (h.deposit.paid) depHtml = `<span class="dep-badge dep-paid">✓ Paid${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''}</span>`;
-        else { const inf = h.deposit.informed ? '✓ Informed' : '! Not informed'; depHtml = `<span class="dep-badge dep-required">Deposit${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`; }
-      } else depHtml = `<span class="dep-none">—</span>`;
-
-      return `<tr class="${alert ? 'hotel-alert' : ''}">
-        <td><strong>${esc(h.name)}</strong></td>
-        <td>${h.checkin || '—'}</td>
-        <td>${h.rooms || 1}</td>
-        <td>${statusBadge}</td>
-        <td>${h.sent || '—'}</td>
-        <td>${h.reply || '—'}</td>
-        <td>${daysCell}</td>
-        <td>${depHtml}</td>
-        <td><div style="display:flex;gap:4px">
-          ${alert ? `<button class="icon-btn" title="Copy follow-up email" onclick="copyFollowup('${b.id}','${h.id}',event)" style="color:#c0392b"><i class="ti ti-mail"></i></button>` : ''}
-          <button class="icon-btn" title="Mark replied / confirmed" onclick="markHotelReplied('${b.id}','${h.id}',event)" style="color:#2d6e2d"><i class="ti ti-check"></i></button>
-        </div></td>
-      </tr>`;
-    }).join('');
-
-    return `<div class="booking-card${hasAlert ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
-      <div class="card-header" onclick="toggleCard('${b.id}')">
-        <div class="card-title">
-          <span class="card-ref">${esc(b.ref)}</span>
-          <span class="card-guest">${esc(b.guest)}</span>
-          <span class="card-agent">${esc(b.agent)}</span>
-          ${partnerLabel}
-          <span style="font-size:12px;color:#aaa">${confirmedCount}/${hotelCnt} confirmed</span>
-          ${b.archived ? '<span class="badge b-archived">Archived</span>' : ''}
-          ${hasAlert ? '<span class="badge b-alert">Follow up required</span>' : ''}
-        </div>
-        <div class="card-actions" onclick="event.stopPropagation()">
-          <button class="icon-btn" title="Edit" onclick="editBooking('${b.id}')"><i class="ti ti-edit"></i></button>
-          ${b.archived
-            ? `<button class="icon-btn" title="Restore" onclick="restoreBooking('${b.id}')" style="color:#1a7a55"><i class="ti ti-archive-off"></i></button>`
-            : `<button class="icon-btn" title="Archive" onclick="archiveBooking('${b.id}')" style="color:#aaa"><i class="ti ti-archive"></i></button>`}
-          <i class="ti ti-chevron-down chevron ${isOpen ? 'open' : ''}"></i>
-        </div>
-      </div>
-      ${isOpen ? `<div class="card-body"><table class="hotels-table">
-        <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Rooms</th><th>Status</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
-        <tbody>${hotelsHtml}</tbody>
-      </table></div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-/* ---------- Booking modal ---------- */
-function refreshPartnerDropdown() {
-  const sel = document.getElementById('f-partner');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— None —</option>' + partners.map(p => `<option value="${p.id}"${p.id===cur?' selected':''}>${esc(p.name)}</option>`).join('');
-}
-
-window.openModal = function(b) {
-  editId = b ? b.id : null;
-  hotelCount = 0;
-  document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
-  document.getElementById('f-ref').value = b ? b.ref : '';
-  document.getElementById('f-agent').value = b ? b.agent : currentUser;
-  document.getElementById('f-guest').value = b ? b.guest : '';
-  refreshPartnerDropdown();
-  document.getElementById('f-partner').value = b ? (b.partnerId || '') : '';
-  document.getElementById('hotel-blocks').innerHTML = '';
-  if (b && b.hotels && b.hotels.length > 0) b.hotels.forEach(h => addHotelBlock(h));
-  else addHotelBlock();
-  document.getElementById('modal').classList.add('open');
-}
-window.closeModal = function(id) { document.getElementById(id).classList.remove('open'); }
-window.bgClose = function(e, id) { if (e.target === document.getElementById(id)) window.closeModal(id); }
-
-window.addHotelBlock = function(h) {
-  hotelCount++;
-  const idx = hotelCount;
-  const hid = h ? h.id : 'h_' + Date.now() + '_' + idx;
-  const today = new Date().toISOString().split('T')[0];
-  const div = document.createElement('div');
-  div.className = 'hotel-block';
-  div.dataset.hid = hid;
-  div.innerHTML = `
-    <div class="hotel-block-title">Hotel ${idx}
-      <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
-    </div>
-    <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
-    <div class="row3">
-      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
-      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
-      <div class="field"><label>Number of Rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
-    </div>
-    <div class="row2">
-      <div class="field"><label>Status</label>
-        <select class="hf-status">
-          <option value="pending"${(!h||h.status==='pending')?' selected':''}>Awaiting Reply</option>
-          <option value="confirmed"${h&&h.status==='confirmed'?' selected':''}>Confirmed</option>
-          <option value="cancelled"${h&&h.status==='cancelled'?' selected':''}>Cancelled</option>
-        </select>
-      </div>
-      <div class="field"><label>Email Sent (Date)</label><input type="date" class="hf-sent" value="${h?h.sent:today}"></div>
-    </div>
-    <div class="row2"><div class="field"><label>Reply Received (Date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div></div>
-    <div class="dep-section">
-      <div class="dep-section-title">Deposit / Payment</div>
-      <div class="checkbox-row">
-        <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDep(this,${idx})">
-        <label for="depreq-${idx}" style="cursor:pointer">Deposit / Immediate Payment Required</label>
-      </div>
-      <div id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
-        <div class="row3" style="margin-top:8px">
-          <div class="field"><label>Amount</label>
-            <div style="display:flex;gap:6px">
-              <select class="hf-dep-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none">
-                <option value="THB"${!h||!h.deposit||h.deposit.currency==='THB'?' selected':''}>THB</option>
-                <option value="USD"${h&&h.deposit&&h.deposit.currency==='USD'?' selected':''}>USD</option>
-                <option value="IDR"${h&&h.deposit&&h.deposit.currency==='IDR'?' selected':''}>IDR</option>
-              </select>
-              <input type="number" class="hf-dep-amount" placeholder="e.g. 5000" value="${h&&h.deposit?h.deposit.amount:''}" style="flex:1">
-            </div>
-          </div>
-          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}><label for="depinf-${idx}" style="cursor:pointer">Account Informed</label></div>
-          </div>
-          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}><label for="deppaid-${idx}" style="cursor:pointer">Account Paid</label></div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  document.getElementById('hotel-blocks').appendChild(div);
-}
-window.toggleDep = function(cb, idx) { document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
-
-window.saveBooking = async function() {
-  const ref = document.getElementById('f-ref').value.trim();
-  const agent = document.getElementById('f-agent').value.trim();
-  const guest = document.getElementById('f-guest').value.trim();
-  const partnerId = document.getElementById('f-partner').value;
-  const partnerName = partnerId ? (partners.find(p=>p.id===partnerId)||{}).name || '' : '';
-  if (!ref || !agent) { alert('Please fill in Booking ref. and Your name.'); return; }
-
-  const hotels = [];
-  document.querySelectorAll('.hotel-block').forEach(block => {
-    const name = block.querySelector('.hf-name').value.trim();
-    if (!name) return;
-    const depReq = block.querySelector('.hf-dep-req').checked;
-    hotels.push({
-      id: block.dataset.hid, name,
-      checkin: block.querySelector('.hf-checkin').value,
-      checkout: block.querySelector('.hf-checkout').value,
-      rooms: parseInt(block.querySelector('.hf-rooms').value) || 1,
-      status: block.querySelector('.hf-status').value,
-      sent: block.querySelector('.hf-sent').value,
-      reply: block.querySelector('.hf-reply').value,
-      deposit: {
-        required: depReq,
-        currency: depReq ? block.querySelector('.hf-dep-currency').value : 'THB',
-        amount: depReq ? block.querySelector('.hf-dep-amount').value.trim() : '',
-        informed: depReq ? block.querySelector('.hf-dep-informed').checked : false,
-        paid: depReq ? block.querySelector('.hf-dep-paid').checked : false,
-      }
-    });
-  });
-  if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
-
-  const existing = editId ? bookings.find(b=>b.id===editId) : null;
-  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, archived: existing ? !!existing.archived : false };
-  await setDoc(doc(db, 'bookings', booking.id), booking);
-  window.closeModal('modal');
-}
-
-window.editBooking = function(id) { const b = bookings.find(x => x.id === id); if (b) { expandedCards.add(id); window.openModal(b); } }
-
-window.archiveBooking = async function(id) {
-  const b = bookings.find(x => x.id === id); if (!b) return;
-  b.archived = true;
-  await setDoc(doc(db, 'bookings', id), b);
-}
-window.restoreBooking = async function(id) {
-  const b = bookings.find(x => x.id === id); if (!b) return;
-  b.archived = false;
-  await setDoc(doc(db, 'bookings', id), b);
-}
-
-window.markHotelReplied = async function(bookingId, hotelId, e) {
-  e.stopPropagation();
-  const b = bookings.find(x => x.id === bookingId); if (!b) return;
-  const h = b.hotels.find(x => x.id === hotelId); if (!h) return;
-  h.reply = new Date().toISOString().split('T')[0];
-  h.status = 'confirmed';
-  await setDoc(doc(db, 'bookings', b.id), b);
-}
-
-window.copyFollowup = function(bookingId, hotelId, e) {
-  e.stopPropagation();
-  const b = bookings.find(x => x.id === bookingId); if (!b) return;
-  const h = b.hotels.find(x => x.id === hotelId); if (!h) return;
-  const text = `Subject: Follow-up: ${b.ref} — ${h.name}\n\nDear Reservations Team,\n\nThis is a follow-up on our booking enquiry sent on ${h.sent}.\n\nCould you please confirm availability and rates at your earliest convenience?\n\nThank you and best regards,\nTeam Asia Evolution`;
-  navigator.clipboard.writeText(text).then(() => showToast('✅ Follow-up email copied — paste into Gmail (Ctrl+V)')).catch(() => prompt('Copy this follow-up email:', text));
-}
-
-window.exportCSV = function() {
-  const rows = [['Ref','Agent','Partner','Guest','Hotel','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Account informed','Account paid','Archived']];
-  bookings.forEach(b => {
-    (b.hotels||[]).forEach(h => {
-      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
-        h.deposit.required?'Yes':'No', h.deposit.currency||'THB', h.deposit.amount||'', h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No', b.archived?'Yes':'No']);
-    });
-  });
-  const csv = rows.map(r => r.map(c => `"${(c||'').toString().replace(/"/g,'""')}"`).join(',')).join('\r\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = 'AET_bookings_' + new Date().toISOString().split('T')[0] + '.csv';
-  a.click();
-}
-
-function showToast(msg) {
-  let t = document.getElementById('toast');
-  if (!t) { t = document.createElement('div'); t.id = 'toast'; t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;opacity:0;transition:opacity 0.3s;pointer-events:none'; document.body.appendChild(t); }
-  t.textContent = msg; t.style.opacity = '1';
-  clearTimeout(t._timer); t._timer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
-}
-
-/* ---------- Response Stats ---------- */
-window.renderStats = function() {
-  const q = (document.getElementById('statsSearch') ? document.getElementById('statsSearch').value : '').toLowerCase();
-  const yearFilter = document.getElementById('statsYearFilter') ? document.getElementById('statsYearFilter').value : '';
-  
-  const map = {}; // hotelName -> {total, count, max, min, nights}
-  let totalNightsAll = 0;
-  bookings.forEach(b => {
-    (b.hotels||[]).forEach(h => {
-      const key = (h.name||'Unknown').trim();
-      const nights = daysBetween(h.checkin, h.checkout);
-      const rooms = h.rooms || 1;
-      const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
-      
-      // Filter by year if selected
-      if (yearFilter && h.checkin) {
-        const checkinYear = h.checkin.split('-')[0];
-        if (checkinYear !== yearFilter) return;
-      }
-      
-      if (validNights > 0) totalNightsAll += validNights;
-
-      const d = daysBetween(h.sent, h.reply);
-      if (!map[key]) map[key] = { total: 0, count: 0, max: 0, min: Infinity, nights: 0 };
-      map[key].nights += validNights;
-      if (d === null || d < 0) return;
-      map[key].total += d; map[key].count++;
-      map[key].max = Math.max(map[key].max, d);
-      map[key].min = Math.min(map[key].min, d);
-    });
-  });
-  let rows = Object.keys(map).map(name => ({
-    name, nights: map[name].nights,
-    avg: map[name].count ? (map[name].total/map[name].count) : null,
-    count: map[name].count, max: map[name].max, min: map[name].min
-  }));
-  if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
-  rows.sort((a,b) => (b.avg||0) - (a.avg||0));
-
-  const wrap = document.getElementById('statsTableWrap');
-  const yearLabel = yearFilter ? ` (${yearFilter})` : '';
-  document.getElementById('totalNightsStat').textContent = totalNightsAll;
-
-  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out and reply dates filled in.</div>'; return; }
-
-  wrap.innerHTML = `<div class="table-wrap" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow-x:auto">
-    <table class="hotels-table" style="min-width:700px">
-      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th><th>Room nights${yearLabel}</th></tr></thead>
-      <tbody>${rows.map(r => `<tr>
-        <td><strong>${esc(r.name)}</strong></td>
-        <td>${r.avg!==null ? r.avg.toFixed(1) + ' days ' + (r.avg>=2 ? '<span class="dep-badge dep-required" style="margin-left:6px">Slow</span>' : '<span class="dep-badge dep-paid" style="margin-left:6px">Fast</span>') : '—'}</td>
-        <td>${r.avg!==null ? r.min + ' d' : '—'}</td>
-        <td>${r.avg!==null ? r.max + ' d' : '—'}</td>
-        <td>${r.count}</td>
-        <td><strong>${r.nights}</strong></td>
-      </tr>`).join('')}</tbody>
-    </table>
-  </div>`;
-}
-
-/* ---------- CRM (Partners & Hotels) ---------- */
-window.setCrmType = function(type, el) {
-  crmType = type;
-  document.querySelectorAll('#panel-crm .filter-row .filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  renderCrm();
-}
-
-function renderCrm() {
-  const list = crmType === 'partners' ? partners : hotelsCrm;
-  const grid = document.getElementById('crmGrid');
-  if (!grid) return;
-  const addLabel = crmType === 'partners' ? 'Add partner' : 'Add hotel';
-  grid.innerHTML = list.map(item => `
-    <div class="crm-card" onclick="openCrmDetail('${crmType}','${item.id}')">
-      <div class="crm-card-name">${esc(item.name)}</div>
-      <div class="crm-card-meta">${esc(item.contact || 'No contact listed')}</div>
-      <span class="crm-card-notecount">${(item.notes||[]).length} note${(item.notes||[]).length===1?'':'s'}</span>
-    </div>
-  `).join('') + `<div class="add-crm-card" onclick="openCrmModal()"><i class="ti ti-plus"></i> ${addLabel}</div>`;
-}
-
-window.openCrmModal = function(item) {
-  editingCrmId = item ? item.id : null;
-  document.getElementById('crmModalTitle').textContent = item ? 'Edit ' + (crmType==='partners'?'partner':'hotel') : (crmType==='partners' ? 'New partner' : 'New hotel');
-  document.getElementById('crm-name').value = item ? item.name : '';
-  document.getElementById('crm-contact').value = item ? (item.contact||'') : '';
-  document.getElementById('crm-emailphone').value = item ? (item.emailphone||'') : '';
-  document.getElementById('crm-info').value = item ? (item.info||'') : '';
-  document.getElementById('crmModal').classList.add('open');
-}
-
-window.saveCrmEntity = async function() {
-  const name = document.getElementById('crm-name').value.trim();
-  if (!name) { alert('Please enter a name.'); return; }
-  const collectionName = crmType === 'partners' ? 'partners' : 'hotelsCrm';
-  const list = crmType === 'partners' ? partners : hotelsCrm;
-  const existing = editingCrmId ? list.find(x=>x.id===editingCrmId) : null;
-  const entity = {
-    id: editingCrmId || ('e_' + Date.now()),
-    name,
-    contact: document.getElementById('crm-contact').value.trim(),
-    emailphone: document.getElementById('crm-emailphone').value.trim(),
-    info: document.getElementById('crm-info').value.trim(),
-    notes: existing ? (existing.notes||[]) : []
-  };
-  await setDoc(doc(db, collectionName, entity.id), entity);
-  window.closeModal('crmModal');
-}
-
-window.openCrmDetail = function(type, id) {
-  currentCrmDetail = { type, id };
-  document.getElementById('crmListView').style.display = 'none';
-  document.getElementById('crmDetailView').style.display = 'block';
-  renderCrmDetail();
-}
-
-function renderCrmDetail() {
-  if (!currentCrmDetail) return;
-  const list = currentCrmDetail.type === 'partners' ? partners : hotelsCrm;
-  const item = list.find(x => x.id === currentCrmDetail.id);
-  const view = document.getElementById('crmDetailView');
-  if (!item) { view.innerHTML = '<div class="empty">This record was deleted.</div>'; return; }
-
-  const notes = (item.notes||[]).slice().sort((a,b) => new Date(b.date) - new Date(a.date));
-
-  view.innerHTML = `
-    <div class="detail-back" onclick="backToCrmList()"><i class="ti ti-arrow-left"></i> Back to ${currentCrmDetail.type === 'partners' ? 'Partners' : 'Hotels'}</div>
-    <div class="detail-header">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
-        <div>
-          <div class="detail-name">${esc(item.name)}</div>
-          <div class="detail-meta-row">
-            ${item.contact ? `<span><i class="ti ti-user"></i> ${esc(item.contact)}</span>` : ''}
-            ${item.emailphone ? `<span><i class="ti ti-mail"></i> ${esc(item.emailphone)}</span>` : ''}
-          </div>
-          ${item.info ? `<div style="margin-top:10px;font-size:13px;color:#555;white-space:pre-wrap">${esc(item.info)}</div>` : ''}
-        </div>
-        <div style="display:flex;gap:6px">
-          <button class="btn sm" onclick='openCrmModal(${JSON.stringify(item).replace(/'/g, "&#39;")})'><i class="ti ti-edit"></i> Edit</button>
-          <button class="btn sm" onclick="deleteCrmEntity()" style="color:#a32d2d"><i class="ti ti-trash"></i> Delete</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="add-note-box">
-      <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Add note</div>
-      <div class="row2" style="margin-bottom:8px">
-        <select id="noteTag" style="padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px">
-          <option value="General">General</option>
-          <option value="Pricing">Pricing</option>
-          <option value="Fuel surcharge">Fuel surcharge</option>
-          <option value="Contract">Contract</option>
-          <option value="Issue">Issue</option>
-        </select>
-        <div></div>
-      </div>
-      <textarea id="noteText" placeholder="What was discussed / agreed / decided..." style="width:100%;min-height:60px;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;margin-bottom:8px"></textarea>
-      <button class="btn primary sm" onclick="addCrmNote()"><i class="ti ti-plus"></i> Save note</button>
-    </div>
-
-    <div class="note-list">
-      ${notes.length === 0 ? '<div class="empty">No notes yet.</div>' : notes.map(n => `
-        <div class="note-card">
-          <div class="note-card-top">
-            <span class="note-author">${esc(n.author)}<span class="note-tag">${esc(n.tag||'General')}</span></span>
-            <span class="note-date">${n.date}</span>
-          </div>
-          <div class="note-text">${esc(n.text)}</div>
-        </div>
-      `).join('')}
-    </div>
-  `;
-}
-
-window.backToCrmList = function() {
-  currentCrmDetail = null;
-  document.getElementById('crmListView').style.display = 'block';
-  document.getElementById('crmDetailView').style.display = 'none';
-  renderCrm();
-}
-
-window.addCrmNote = async function() {
-  const text = document.getElementById('noteText').value.trim();
-  if (!text) return;
-  const tag = document.getElementById('noteTag').value;
-  const collectionName = currentCrmDetail.type === 'partners' ? 'partners' : 'hotelsCrm';
-  const list = currentCrmDetail.type === 'partners' ? partners : hotelsCrm;
-  const item = list.find(x => x.id === currentCrmDetail.id);
-  if (!item) return;
-  const notes = item.notes || [];
-  notes.push({ author: currentUser, date: new Date().toISOString().split('T')[0], tag, text });
-  item.notes = notes;
-  await setDoc(doc(db, collectionName, item.id), item);
-}
-
-window.deleteCrmEntity = async function() {
-  if (!confirm('Delete this record and all its notes? This cannot be undone.')) return;
-  const collectionName = currentCrmDetail.type === 'partners' ? 'partners' : 'hotelsCrm';
-  await deleteDoc(doc(db, collectionName, currentCrmDetail.id));
-  window.backToCrmList();
-}
-
-/* ---------- SOPs ---------- */
-window.openSopModal = function(sop) {
-  editingSopId = sop ? sop.id : null;
-  document.getElementById('sopModalTitle').textContent = sop ? 'Edit SOP' : 'New SOP';
-  document.getElementById('sop-title').value = sop ? sop.title : '';
-  document.getElementById('sop-content').value = sop ? sop.content : '';
-  document.getElementById('sop-newcat-field').style.display = 'none';
-  document.getElementById('sop-newcat').value = '';
-  const catSelect = document.getElementById('sop-category');
-  const existingCats = [...new Set(sops.map(s => s.category))];
-  const baseCats = ['Hotel issues','Payment','Visa / documents','Transport','Vouchers','General'];
-  const allCats = [...new Set([...baseCats, ...existingCats])];
-  catSelect.innerHTML = allCats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('') + '<option value="__new">+ New category...</option>';
-  catSelect.value = sop ? sop.category : 'General';
-  document.getElementById('sopModal').classList.add('open');
-}
-document.getElementById('sop-category').addEventListener('change', function() {
-  document.getElementById('sop-newcat-field').style.display = this.value === '__new' ? 'block' : 'none';
-});
-
-window.saveSop = async function() {
-  const title = document.getElementById('sop-title').value.trim();
-  const content = document.getElementById('sop-content').value.trim();
-  let category = document.getElementById('sop-category').value;
-  if (category === '__new') {
-    category = document.getElementById('sop-newcat').value.trim();
-    if (!category) { alert('Please enter a category name.'); return; }
-  }
-  if (!title || !content) { alert('Please fill in title and content.'); return; }
-  const existing = editingSopId ? sops.find(s=>s.id===editingSopId) : null;
-  const sop = {
-    id: editingSopId || ('s_' + Date.now()),
-    title, category, content,
-    author: existing ? existing.author : currentUser,
-    createdDate: existing ? existing.createdDate : new Date().toISOString().split('T')[0],
-    updatedBy: currentUser,
-    updatedDate: new Date().toISOString().split('T')[0]
-  };
-  await setDoc(doc(db, 'sops', sop.id), sop);
-  window.closeModal('sopModal');
-}
-
-window.deleteSop = async function(id) {
-  if (!confirm('Delete this SOP?')) return;
-  await deleteDoc(doc(db, 'sops', id));
-}
-
-let expandedSops = new Set();
-window.toggleSop = function(id) { if (expandedSops.has(id)) expandedSops.delete(id); else expandedSops.add(id); renderSops(); }
-
-window.setSopCat = function(cat, el) {
-  sopCategoryFilter = cat;
-  document.querySelectorAll('#sopCatRow .filter-btn').forEach(b => b.classList.remove('active'));
-  el.classList.add('active');
-  renderSops();
-}
-
-window.renderSops = function renderSops() {
-  const q = (document.getElementById('sopSearch') ? document.getElementById('sopSearch').value : '').toLowerCase();
-  const cats = [...new Set(sops.map(s => s.category))].sort();
-  const catRow = document.getElementById('sopCatRow');
-  if (catRow) {
-    catRow.innerHTML = `<button class="filter-btn${sopCategoryFilter===''?' active':''}" onclick="setSopCat('',this)">All</button>` +
-      cats.map(c => `<button class="filter-btn${sopCategoryFilter===c?' active':''}" onclick="setSopCat('${esc(c)}',this)">${esc(c)}</button>`).join('');
-  }
-
-  let filtered = sops.filter(s => {
-    if (sopCategoryFilter && s.category !== sopCategoryFilter) return false;
-    if (q && !`${s.title} ${s.content}`.toLowerCase().includes(q)) return false;
-    return true;
-  });
-  filtered.sort((a,b) => a.title.localeCompare(b.title));
-
-  const list = document.getElementById('sopList');
-  if (filtered.length === 0) { list.innerHTML = ''; document.getElementById('sopEmpty').style.display = 'block'; return; }
-  document.getElementById('sopEmpty').style.display = 'none';
-
-  list.innerHTML = filtered.map(s => {
-    const open = expandedSops.has(s.id);
-    return `<div class="sop-card">
-      <div class="sop-card-header" onclick="toggleSop('${s.id}')">
-        <div><span class="sop-title">${esc(s.title)}</span><span class="sop-cat-badge">${esc(s.category)}</span></div>
-        <div style="display:flex;gap:6px;align-items:center" onclick="event.stopPropagation()">
-          <button class="icon-btn" onclick='openSopModal(${JSON.stringify(s).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" onclick="deleteSop('${s.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
-          <i class="ti ti-chevron-down chevron ${open?'open':''}"></i>
-        </div>
-      </div>
-      ${open ? `<div class="sop-body">${esc(s.content)}<div class="sop-meta">Added by ${esc(s.author)} on ${s.createdDate}${s.updatedBy && s.updatedDate !== s.createdDate ? ` · last updated by ${esc(s.updatedBy)} on ${s.updatedDate}` : ''}</div></div>` : ''}
-    </div>`;
-  }).join('');
-}
-
-</div><!-- END page-wrapper -->
-
-<script>
-// Password protection
-const CORRECT_PASSWORD = 'AET2024';
-const SESSION_KEY = 'aet_tracker_session';
-
-// Check password on load
-window.addEventListener('load', () => {
-  if (sessionStorage.getItem(SESSION_KEY)) {
-    showApp();
-  } else {
-    showLogin();
-  }
-});
-
-function checkPassword() {
-  const input = document.getElementById('passwordInput').value;
-  const errorMsg = document.getElementById('errorMsg');
-  
-  if (input === CORRECT_PASSWORD) {
-    sessionStorage.setItem(SESSION_KEY, 'true');
-    errorMsg.style.display = 'none';
-    showApp();
-    console.log('✅ Correct password - access granted');
-  } else {
-    errorMsg.style.display = 'block';
-    document.getElementById('passwordInput').value = '';
-    console.log('❌ Incorrect password attempt');
-  }
-}
-
-window.checkPassword = checkPassword;
-window.showLogin = showLogin;
-window.showApp = showApp;
-
-function showLogin() {
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('pageWrapper').classList.remove('active');
-  document.getElementById('passwordInput').value = '';
-  document.getElementById('passwordInput').focus();
-}
-
-function showApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('pageWrapper').classList.add('active');
-}
-
-// Allow Enter key
-document.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
-    checkPassword();
-  }
-});
-
-// Add logout button functionality
-const originalLogout = window.logout || function() {};
-window.logout = function() {
-  if (confirm('Sign out?')) {
-    sessionStorage.removeItem(SESSION_KEY);
-    showLogin();
-    console.log('✅ Logged out');
-  }
-};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+console.log('✅ Firebase initialized');
 </script>
+
+</body>
+</html>
