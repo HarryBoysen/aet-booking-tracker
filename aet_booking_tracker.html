@@ -8,22 +8,6 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f5f5f3;color:#1a1a1a;font-size:14px;min-height:100vh}
-
-/* Password Login */
-.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1a7a55 0%,#0f5a3d 100%);display:flex;align-items:center;justify-content:center;z-index:9999}
-.login-box{background:#fff;border-radius:16px;padding:3rem;width:min(400px,90vw);box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center}
-.login-box h1{font-size:28px;margin-bottom:8px;color:#1a1a1a}
-.login-box p{font-size:14px;color:#666;margin-bottom:2rem;line-height:1.6}
-.login-logo{font-size:56px;margin-bottom:1.5rem}
-.login-input{width:100%;padding:12px 14px;font-size:15px;border:1px solid #ddd;border-radius:8px;margin-bottom:1rem;outline:none}
-.login-input:focus{border-color:#1a7a55;box-shadow:0 0 0 3px rgba(26,122,85,0.1)}
-.login-btn{width:100%;padding:12px 16px;background:#1a7a55;border:none;border-radius:8px;font-size:15px;font-weight:600;color:#fff;cursor:pointer;transition:all 0.2s}
-.login-btn:hover{background:#145e41}
-.login-box .footer{margin-top:2rem;padding-top:1.5rem;border-top:0.5px solid #eee;font-size:12px;color:#999}
-.error{color:#d32f2f;font-size:13px;margin-top:8px;display:none}
-.page-wrapper{display:none}
-.page-wrapper.active{display:block}
-
 .page{max-width:1200px;margin:0 auto;padding:1.5rem}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.5rem}
 .stat{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;padding:14px 16px}
@@ -158,22 +142,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </head>
 <body>
 
-<!-- PASSWORD LOGIN SCREEN -->
-<div id="loginScreen" class="login-screen">
-  <div class="login-box">
-    <div class="login-logo">🔐</div>
-    <h1>AET Booking Tracker</h1>
-    <p>Enter the access code to continue. Team members can work from anywhere in the world.</p>
-    <input type="password" id="passwordInput" class="login-input" placeholder="Enter access code..." autofocus>
-    <button class="login-btn" onclick="checkPassword()">Sign In</button>
-    <div class="error" id="errorMsg">Incorrect access code. Please try again.</div>
-    <div class="footer">Your data is secure. Only authorized team members can access the tracker.</div>
-  </div>
-</div>
-
-<!-- MAIN APP WRAPPER -->
-<div class="page-wrapper" id="pageWrapper">
-
 <div class="loading" id="loading"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:20px"></i> Connecting...</div>
 
 <div class="name-screen" id="nameScreen" style="display:none">
@@ -185,23 +153,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
-<!-- PASSWORD LOGIN -->
-<div id="login" style="position:fixed;inset:0;background:linear-gradient(135deg,#1a7a55,#0f5a3d);display:flex;align-items:center;justify-content:center;z-index:9999">
-  <div style="background:#fff;padding:3rem;width:min(400px,90vw);border-radius:16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-    <div style="font-size:56px;margin-bottom:20px">🔐</div>
-    <h1 style="font-size:28px;margin-bottom:20px">AET Booking Tracker</h1>
-    <input type="password" id="pwd" style="width:100%;padding:12px;font-size:15px;border:1px solid #ddd;border-radius:8px;margin-bottom:15px;outline:none" placeholder="Access code" autofocus>
-    <button onclick="checkPwd()" style="width:100%;padding:12px;font-size:15px;background:#1a7a55;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Sign In</button>
-    <div id="err" style="color:red;font-size:13px;margin-top:10px;display:none">Wrong code</div>
-  </div>
-</div>
-
-
-<div class="page" id="appWrapper">
+<div class="page" id="mainApp" style="display:none">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
     <div>
       <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
-      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="changeName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(change)</button> &nbsp;·&nbsp; <button onclick="logout()" style="background:none;border:none;color:#d32f2f;cursor:pointer;font-size:12px;font-weight:500">Sign Out</button></div>
+      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="changeName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(change)</button></div>
     </div>
   </div>
 
@@ -221,8 +177,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="stats" id="stats"></div>
     <div class="filter-row">
       <button class="filter-btn active" onclick="setFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setFilter('pre-booking',this)"><i class="ti ti-alert-circle"></i> Pre-Bookings</button>
       <button class="filter-btn" onclick="setFilter('alert',this)"><i class="ti ti-alert-circle"></i> Follow-up required</button>
       <button class="filter-btn" onclick="setFilter('deposit',this)"><i class="ti ti-credit-card"></i> Deposit pending</button>
+      <button class="filter-btn" onclick="setFilter('creditcard',this)"><i class="ti ti-credit-card"></i> Credit card pending</button>
       <button class="filter-btn" onclick="setFilter('confirmed',this)">Confirmed</button>
       <button class="filter-btn" onclick="setFilter('archived',this)"><i class="ti ti-archive"></i> Archived</button>
     </div>
@@ -294,6 +252,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="field"><label>Partner (Optional)</label>
     <select id="f-partner"><option value="">— None —</option></select>
   </div>
+  <div class="field"><label>Booking Type</label>
+    <select id="f-booking-type">
+      <option value="pre-booking">Pre-Booking</option>
+      <option value="real-booking" selected>Real Booking</option>
+    </select>
+  </div>
   <div class="section-divider">Hotels</div>
   <div id="hotel-blocks"></div>
   <button class="add-hotel-btn" onclick="addHotelBlock()"><i class="ti ti-plus"></i> Add Hotel</button>
@@ -317,6 +281,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="modal-footer">
     <button class="btn" onclick="closeModal('crmModal')">Cancel</button>
     <button class="btn primary" onclick="saveCrmEntity()">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Trips Modal -->
+<div class="modal-bg" id="tripModal" onclick="bgClose(event,'tripModal')">
+<div class="modal">
+  <h2 id="tripModalTitle">New Trip/Program</h2>
+  <div class="field"><label>Trip Name</label><input id="trip-name" placeholder="e.g. Albatros Winter 2026/2027 Round Trip"></div>
+  <div class="row2">
+    <div class="field"><label>Start Date</label><input type="date" id="trip-start"></div>
+    <div class="field"><label>End Date</label><input type="date" id="trip-end"></div>
+  </div>
+  <div class="field"><label>Google Drive Folder Link</label><input id="trip-gdrive" placeholder="https://drive.google.com/drive/folders/..."></div>
+  <div class="field"><label>Notes (Groups, Special Info, etc.)</label><textarea id="trip-notes" placeholder="24 groups, hotel confirmations, special rates +500 THB fuel, etc." style="min-height:100px"></textarea></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('tripModal')">Cancel</button>
+    <button class="btn primary" onclick="saveTrip()">Save Trip</button>
   </div>
 </div>
 </div>
@@ -368,6 +350,7 @@ let bookings = [];
 let partners = [];
 let hotelsCrm = [];
 let sops = [];
+let trips = [];
 
 let editId = null;
 let currentFilter = 'all';
@@ -424,6 +407,11 @@ function startApp() {
     renderSops();
   });
 
+  onSnapshot(collection(db, 'trips'), (snap) => {
+    trips = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if (currentCrmDetail && currentCrmDetail.type === 'partners') renderCrmDetail();
+  });
+
   // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
 }
 
@@ -456,8 +444,9 @@ window.switchTab = function(tab) {
 function daysSince(dateStr) { if (!dateStr) return null; return Math.floor((new Date() - new Date(dateStr)) / 86400000); }
 function daysBetween(a,b) { if(!a||!b) return null; return Math.floor((new Date(b) - new Date(a)) / 86400000); }
 function hotelNeedsFollowup(h) { return h.status === 'pending' && !h.reply && daysSince(h.sent) >= 2; }
-function bookingHasAlert(b) { return !b.archived && (b.hotels||[]).some(hotelNeedsFollowup); }
-function bookingHasDepositPending(b) { return !b.archived && (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
+function bookingHasAlert(b) { return (b.hotels||[]).some(hotelNeedsFollowup); }
+function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
+function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Bookings render ---------- */
@@ -486,9 +475,15 @@ window.render = function render() {
     if (q && !`${b.ref} ${b.guest} ${b.agent} ${hotelNames}`.toLowerCase().includes(q)) return false;
     if (ag && (b.agent||'').trim().toLowerCase() !== ag.trim().toLowerCase()) return false;
     if (currentFilter === 'archived') return !!b.archived;
-    if (b.archived) return false; // hide archived from all other views
-    if (currentFilter === 'alert') return bookingHasAlert(b);
-    if (currentFilter === 'deposit') return bookingHasDepositPending(b);
+    if (currentFilter === 'alert' || currentFilter === 'deposit' || currentFilter === 'creditcard') {
+      // These filters show both archived and non-archived
+      if (currentFilter === 'alert') return bookingHasAlert(b);
+      if (currentFilter === 'deposit') return bookingHasDepositPending(b);
+      if (currentFilter === 'creditcard') return bookingHasCreditCardPending(b);
+    }
+    // For other filters, hide archived
+    if (b.archived) return false;
+    if (currentFilter === 'pre-booking') return b.booking_type === 'pre-booking';
     if (currentFilter === 'confirmed') return (b.hotels||[]).every(h => h.status === 'confirmed');
     return true;
   });
@@ -523,6 +518,14 @@ window.render = function render() {
     const hotelCnt = (b.hotels||[]).length;
     const confirmedCount = (b.hotels||[]).filter(h => h.status === 'confirmed').length;
     const partnerLabel = b.partnerName ? `<span style="font-size:11px;color:#1a7a55;background:#eafaf2;padding:2px 8px;border-radius:20px">${esc(b.partnerName)}</span>` : '';
+    
+    // Check for 45-day pre-booking alarm
+    const preBookingAlert = b.booking_type === 'pre-booking' && (b.hotels||[]).some(h => {
+      if (!h.checkin) return false;
+      const daysUntilCheckIn = Math.floor((new Date(h.checkin) - new Date()) / 86400000);
+      return daysUntilCheckIn <= 45 && daysUntilCheckIn > 0;
+    });
+    const cardAlertClass = hasAlert || preBookingAlert ? 'has-alert' : '';
 
     const hotelsHtml = (b.hotels||[]).map(h => {
       const alert = hotelNeedsFollowup(h);
@@ -555,12 +558,14 @@ window.render = function render() {
       </tr>`;
     }).join('');
 
-    return `<div class="booking-card${hasAlert ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
+    return `<div class="booking-card${cardAlertClass ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
       <div class="card-header" onclick="toggleCard('${b.id}')">
         <div class="card-title">
           <span class="card-ref">${esc(b.ref)}</span>
           <span class="card-guest">${esc(b.guest)}</span>
           <span class="card-agent">${esc(b.agent)}</span>
+          ${b.booking_type === 'pre-booking' ? '<span style="font-size:11px;background:#fef3e2;color:#7a4a00;padding:2px 8px;border-radius:20px">Pre-Booking</span>' : ''}
+          ${preBookingAlert ? '<span style="font-size:11px;background:#fce8e8;color:#a32d2d;padding:2px 8px;border-radius:20px;margin-left:4px">⚠ 45 days</span>' : ''}
           ${partnerLabel}
           <span style="font-size:12px;color:#aaa">${confirmedCount}/${hotelCnt} confirmed</span>
           ${b.archived ? '<span class="badge b-archived">Archived</span>' : ''}
@@ -571,6 +576,7 @@ window.render = function render() {
           ${b.archived
             ? `<button class="icon-btn" title="Restore" onclick="restoreBooking('${b.id}')" style="color:#1a7a55"><i class="ti ti-archive-off"></i></button>`
             : `<button class="icon-btn" title="Archive" onclick="archiveBooking('${b.id}')" style="color:#aaa"><i class="ti ti-archive"></i></button>`}
+          <button class="icon-btn" title="Delete" onclick="deleteBooking('${b.id}')" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
           <i class="ti ti-chevron-down chevron ${isOpen ? 'open' : ''}"></i>
         </div>
       </div>
@@ -641,6 +647,30 @@ window.addHotelBlock = function(h) {
         <input type="checkbox" class="hf-dep-req" id="depreq-${idx}" ${h&&h.deposit&&h.deposit.required?'checked':''} onchange="toggleDep(this,${idx})">
         <label for="depreq-${idx}" style="cursor:pointer">Deposit / Immediate Payment Required</label>
       </div>
+      <div class="checkbox-row" style="margin-top:6px">
+        <input type="checkbox" class="hf-cc-req" id="ccreq-${idx}" ${h&&h.creditcard&&h.creditcard.required?'checked':''} onchange="toggleCC(this,${idx})">
+        <label for="ccreq-${idx}" style="cursor:pointer">Credit Card Required</label>
+      </div>
+      <div id="cc-fields-${idx}" style="${h&&h.creditcard&&h.creditcard.required?'':'display:none'}">
+        <div class="row3" style="margin-top:8px">
+          <div class="field"><label>Amount</label>
+            <div style="display:flex;gap:6px">
+              <select class="hf-cc-currency" style="width:80px;padding:8px 6px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;outline:none">
+                <option value="THB"${!h||!h.creditcard||h.creditcard.currency==='THB'?' selected':''}>THB</option>
+                <option value="USD"${h&&h.creditcard&&h.creditcard.currency==='USD'?' selected':''}>USD</option>
+                <option value="IDR"${h&&h.creditcard&&h.creditcard.currency==='IDR'?' selected':''}>IDR</option>
+              </select>
+              <input type="number" class="hf-cc-amount" placeholder="e.g. 5000" value="${h&&h.creditcard?h.creditcard.amount:''}" style="flex:1">
+            </div>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-informed" id="ccinf-${idx}" ${h&&h.creditcard&&h.creditcard.informed?'checked':''}><label for="ccinf-${idx}" style="cursor:pointer">Account Informed</label></div>
+          </div>
+          <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-paid" id="ccpaid-${idx}" ${h&&h.creditcard&&h.creditcard.paid?'checked':''}><label for="ccpaid-${idx}" style="cursor:pointer">Account Paid</label></div>
+          </div>
+        </div>
+      </div>
       <div id="dep-fields-${idx}" style="${h&&h.deposit&&h.deposit.required?'':'display:none'}">
         <div class="row3" style="margin-top:8px">
           <div class="field"><label>Amount</label>
@@ -661,10 +691,12 @@ window.addHotelBlock = function(h) {
           </div>
         </div>
       </div>
+      <div class="field" style="margin-top:10px"><label>Payment / Deposit Note</label><textarea class="hf-dep-note" placeholder="e.g. Special terms, payment plan, credit card brand required..." style="min-height:60px;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px">${h&&h.depositNote?h.depositNote:''}</textarea></div>
     </div>`;
   document.getElementById('hotel-blocks').appendChild(div);
 }
 window.toggleDep = function(cb, idx) { document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
+window.toggleCC = function(cb, idx) { document.getElementById('cc-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
 
 window.saveBooking = async function() {
   const ref = document.getElementById('f-ref').value.trim();
@@ -679,6 +711,7 @@ window.saveBooking = async function() {
     const name = block.querySelector('.hf-name').value.trim();
     if (!name) return;
     const depReq = block.querySelector('.hf-dep-req').checked;
+    const ccReq = block.querySelector('.hf-cc-req').checked;
     hotels.push({
       id: block.dataset.hid, name,
       checkin: block.querySelector('.hf-checkin').value,
@@ -693,13 +726,22 @@ window.saveBooking = async function() {
         amount: depReq ? block.querySelector('.hf-dep-amount').value.trim() : '',
         informed: depReq ? block.querySelector('.hf-dep-informed').checked : false,
         paid: depReq ? block.querySelector('.hf-dep-paid').checked : false,
-      }
+      },
+      creditcard: {
+        required: ccReq,
+        currency: ccReq ? block.querySelector('.hf-cc-currency').value : 'THB',
+        amount: ccReq ? block.querySelector('.hf-cc-amount').value.trim() : '',
+        informed: ccReq ? block.querySelector('.hf-cc-informed').checked : false,
+        paid: ccReq ? block.querySelector('.hf-cc-paid').checked : false,
+      },
+      depositNote: block.querySelector('.hf-dep-note').value.trim()
     });
   });
   if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
 
   const existing = editId ? bookings.find(b=>b.id===editId) : null;
-  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, archived: existing ? !!existing.archived : false };
+  const bookingType = document.getElementById('f-booking-type').value;
+  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, booking_type: bookingType, archived: existing ? !!existing.archived : false };
   await setDoc(doc(db, 'bookings', booking.id), booking);
   window.closeModal('modal');
 }
@@ -715,6 +757,11 @@ window.restoreBooking = async function(id) {
   const b = bookings.find(x => x.id === id); if (!b) return;
   b.archived = false;
   await setDoc(doc(db, 'bookings', id), b);
+}
+
+window.deleteBooking = async function(id) {
+  if (!confirm('Are you sure you want to delete this booking? This cannot be undone.')) return;
+  await deleteDoc(doc(db, 'bookings', id));
 }
 
 window.markHotelReplied = async function(bookingId, hotelId, e) {
@@ -896,10 +943,18 @@ function renderCrmDetail() {
         </div>
         <div style="display:flex;gap:6px">
           <button class="btn sm" onclick='openCrmModal(${JSON.stringify(item).replace(/'/g, "&#39;")})'><i class="ti ti-edit"></i> Edit</button>
+          ${currentCrmDetail.type === 'partners' ? `<button class="btn sm" onclick="openTripModal('${item.id}')"><i class="ti ti-plus"></i> Add Trip</button>` : ''}
           <button class="btn sm" onclick="deleteCrmEntity()" style="color:#a32d2d"><i class="ti ti-trash"></i> Delete</button>
         </div>
       </div>
     </div>
+
+    ${currentCrmDetail.type === 'partners' ? `
+      <div style="margin-top:2rem;margin-bottom:2rem">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Active Trips & Programs</div>
+        <div id="trips-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px"></div>
+      </div>
+    ` : ''}
 
     <div class="add-note-box">
       <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.05em">Add note</div>
@@ -929,6 +984,30 @@ function renderCrmDetail() {
       `).join('')}
     </div>
   `;
+
+  // Render trips for partners
+  if (currentCrmDetail.type === 'partners') {
+    const partnerTrips = trips.filter(t => t.partnerId === item.id);
+    const tripsHtml = partnerTrips.length === 0 
+      ? '<div class="empty">No trips yet</div>'
+      : partnerTrips.map(t => `
+        <div style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;padding:14px;cursor:pointer" onclick="openTripModal('${item.id}', '${t.id}')">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+            <div style="font-weight:600">${esc(t.name)}</div>
+            <button class="icon-btn" onclick="deleteTrip('${t.id}'); event.stopPropagation()" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
+          </div>
+          <div style="font-size:12px;color:#888;margin-bottom:8px">${t.start ? new Date(t.start).toLocaleDateString() : 'No date'} - ${t.end ? new Date(t.end).toLocaleDateString() : ''}</div>
+          ${t.gdrive ? `<div style="margin-bottom:8px"><a href="${esc(t.gdrive)}" target="_blank" onclick="event.stopPropagation()" style="color:#1a7a55;font-size:12px"><i class="ti ti-folder"></i> Google Drive</a></div>` : ''}
+          ${t.notes ? `<div style="font-size:12px;color:#555;margin-bottom:8px;white-space:pre-wrap">${esc(t.notes.substring(0, 100))}${t.notes.length > 100 ? '...' : ''}</div>` : ''}
+          <div style="font-size:11px;color:#aaa">by ${t.author} · ${t.created}</div>
+        </div>
+      `).join('');
+    
+    setTimeout(() => {
+      const tripsList = document.getElementById('trips-list');
+      if (tripsList) tripsList.innerHTML = tripsHtml;
+    }, 0);
+  }
 }
 
 window.backToCrmList = function() {
@@ -957,6 +1036,75 @@ window.deleteCrmEntity = async function() {
   const collectionName = currentCrmDetail.type === 'partners' ? 'partners' : 'hotelsCrm';
   await deleteDoc(doc(db, collectionName, currentCrmDetail.id));
   window.backToCrmList();
+}
+
+window.openTripModal = function(partnerId, tripId) {
+  document.getElementById('tripModal').classList.add('open');
+  document.getElementById('trip-name').dataset.partnerId = partnerId;
+  document.getElementById('trip-name').dataset.tripId = tripId || '';
+  
+  if (tripId) {
+    // Edit mode
+    const trip = trips.find(t => t.id === tripId);
+    if (!trip) return;
+    document.getElementById('tripModalTitle').textContent = 'Edit Trip/Program';
+    document.getElementById('trip-name').value = trip.name || '';
+    document.getElementById('trip-start').value = trip.start || '';
+    document.getElementById('trip-end').value = trip.end || '';
+    document.getElementById('trip-gdrive').value = trip.gdrive || '';
+    document.getElementById('trip-notes').value = trip.notes || '';
+  } else {
+    // New mode
+    document.getElementById('tripModalTitle').textContent = 'New Trip/Program';
+    document.getElementById('trip-name').value = '';
+    document.getElementById('trip-start').value = '';
+    document.getElementById('trip-end').value = '';
+    document.getElementById('trip-gdrive').value = '';
+    document.getElementById('trip-notes').value = '';
+  }
+}
+
+window.saveTrip = async function() {
+  const name = document.getElementById('trip-name').value.trim();
+  const partnerId = document.getElementById('trip-name').dataset.partnerId;
+  const tripId = document.getElementById('trip-name').dataset.tripId;
+  if (!name) { alert('Enter trip name'); return; }
+  
+  const tripData = {
+    partnerId,
+    name,
+    start: document.getElementById('trip-start').value,
+    end: document.getElementById('trip-end').value,
+    gdrive: document.getElementById('trip-gdrive').value.trim(),
+    notes: document.getElementById('trip-notes').value.trim()
+  };
+  
+  if (tripId) {
+    // Update existing trip
+    const existingTrip = trips.find(t => t.id === tripId);
+    if (existingTrip) {
+      tripData.created = existingTrip.created;
+      tripData.author = existingTrip.author;
+      tripData.updated = new Date().toISOString().split('T')[0];
+    }
+    await setDoc(doc(db, 'trips', tripId), tripData);
+  } else {
+    // Create new trip
+    tripData.id = 't_' + Date.now();
+    tripData.created = new Date().toISOString().split('T')[0];
+    tripData.author = currentUser;
+    await setDoc(doc(db, 'trips', tripData.id), tripData);
+  }
+  
+  window.closeModal('tripModal');
+  renderCrmDetail();
+}
+
+window.deleteTrip = async function(tripId) {
+  if (confirm('Delete this trip?')) {
+    await deleteDoc(doc(db, 'trips', tripId));
+    renderCrmDetail();
+  }
 }
 
 /* ---------- SOPs ---------- */
@@ -1051,87 +1199,6 @@ window.renderSops = function renderSops() {
     </div>`;
   }).join('');
 }
-
-</div><!-- END page-wrapper -->
-
-<script>
-// Password protection
-const CORRECT_PASSWORD = 'AET2024';
-const SESSION_KEY = 'aet_tracker_session';
-
-// Check password on load
-window.addEventListener('load', () => {
-  if (sessionStorage.getItem(SESSION_KEY)) {
-    showApp();
-  } else {
-    showLogin();
-  }
-});
-
-function checkPassword() {
-  const input = document.getElementById('passwordInput').value;
-  const errorMsg = document.getElementById('errorMsg');
-  
-  if (input === CORRECT_PASSWORD) {
-    sessionStorage.setItem(SESSION_KEY, 'true');
-    errorMsg.style.display = 'none';
-    showApp();
-    console.log('✅ Correct password - access granted');
-  } else {
-    errorMsg.style.display = 'block';
-    document.getElementById('passwordInput').value = '';
-    console.log('❌ Incorrect password attempt');
-  }
-}
-
-function showLogin() {
-  document.getElementById('loginScreen').style.display = 'flex';
-  document.getElementById('pageWrapper').classList.remove('active');
-  document.getElementById('passwordInput').value = '';
-  document.getElementById('passwordInput').focus();
-}
-
-function showApp() {
-  document.getElementById('loginScreen').style.display = 'none';
-  document.getElementById('pageWrapper').classList.add('active');
-}
-
-// Allow Enter key
-document.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
-    checkPassword();
-  }
-});
-
-// Add logout button functionality
-const originalLogout = window.logout || function() {};
-window.logout = function() {
-  if (confirm('Sign out?')) {
-    sessionStorage.removeItem(SESSION_KEY);
-    showLogin();
-    console.log('✅ Logged out');
-  }
-};
 </script>
-
-// Password check
-function checkPwd() {
-  const pwd = 'AET2024';
-  if (document.getElementById('pwd').value === pwd) {
-    sessionStorage.setItem('logged', '1');
-    document.getElementById('login').style.display = 'none';
-    document.getElementById('appWrapper').style.display = 'block';
-  } else {
-    document.getElementById('err').style.display = 'block';
-    document.getElementById('pwd').value = '';
-  }
-}
-
-document.getElementById('pwd').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') checkPwd();
-});
-
-if (sessionStorage.getItem('logged')) {
-  document.getElementById('login').style.display = 'none';
-  document.getElementById('appWrapper').style.display = 'block';
-}
+</body>
+</html>
