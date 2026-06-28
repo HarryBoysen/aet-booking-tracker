@@ -111,20 +111,28 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// Sign in with Google
+// Sign in with Google - using Redirect instead of Popup
 document.getElementById('googleSignInBtn').addEventListener('click', () => {
   console.log('🔐 Google Sign-In clicked');
   const provider = new firebase.auth.GoogleAuthProvider();
   
-  auth.signInWithPopup(provider)
-    .then((result) => {
-      console.log('✅ Successfully signed in:', result.user.email);
-    })
+  auth.signInWithRedirect(provider)
     .catch((error) => {
       console.error('❌ Sign-in error:', error.code, error.message);
       alert('Sign in failed: ' + error.message);
     });
 });
+
+// Handle redirect result
+auth.getRedirectResult()
+  .then((result) => {
+    if (result.user) {
+      console.log('✅ Successfully signed in via redirect:', result.user.email);
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Redirect result error:', error.code, error.message);
+  });
 
 // Sign out
 document.getElementById('signOutBtn').addEventListener('click', () => {
