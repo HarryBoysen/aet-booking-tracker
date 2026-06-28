@@ -1072,6 +1072,10 @@ function checkPassword() {
   }
 }
 
+window.checkPassword = checkPassword;
+window.showLogin = showLogin;
+window.showApp = showApp;
+
 function showLogin() {
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('pageWrapper').classList.remove('active');
