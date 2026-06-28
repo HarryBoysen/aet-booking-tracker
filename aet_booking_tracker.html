@@ -1145,8 +1145,11 @@ window.addEventListener("load", () => {
 });
 
 document.addEventListener("keypress", (e) => {
-  if (e.key === "Enter" && document.getElementById("loginScreen").style.display !== "none") {
-    checkPassword();
+  if (e.key === "Enter") {
+    const loginScreen = document.getElementById("loginScreen");
+    if (loginScreen && loginScreen.style.display !== "none") {
+      checkPassword();
+    }
   }
 });
 </script>
