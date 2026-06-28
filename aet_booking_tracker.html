@@ -174,19 +174,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <!-- MAIN APP WRAPPER -->
 <div class="page-wrapper" id="pageWrapper">
 
-<!-- PASSWORD LOGIN -->
-<div id="login" style="position:fixed;inset:0;background:linear-gradient(135deg,#1a7a55,#0f5a3d);display:flex;align-items:center;justify-content:center;z-index:9999">
-  <div style="background:#fff;padding:3rem;width:min(400px,90vw);border-radius:16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-    <div style="font-size:56px;margin-bottom:20px">🔐</div>
-    <h1 style="font-size:28px;margin-bottom:20px">AET Booking Tracker</h1>
-    <input type="password" id="pwd" style="width:100%;padding:12px;font-size:15px;border:1px solid #ddd;border-radius:8px;margin-bottom:15px;box-sizing:border-box" placeholder="Access code" autofocus>
-    <button onclick="tryLogin()" style="width:100%;padding:12px;font-size:15px;background:#1a7a55;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Sign In</button>
-    <div id="err" style="color:red;font-size:13px;margin-top:10px;display:none">Wrong code</div>
-  </div>
-</div>
-
-<div id="appWrapper" style="display:none">
-
 <div class="loading" id="loading"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:20px"></i> Connecting...</div>
 
 <div class="name-screen" id="nameScreen" style="display:none">
@@ -198,7 +185,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   </div>
 </div>
 
-<div class="page" id="mainApp" style="display:none">
+<!-- PASSWORD LOGIN -->
+<div id="login" style="position:fixed;inset:0;background:linear-gradient(135deg,#1a7a55,#0f5a3d);display:flex;align-items:center;justify-content:center;z-index:9999">
+  <div style="background:#fff;padding:3rem;width:min(400px,90vw);border-radius:16px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="font-size:56px;margin-bottom:20px">🔐</div>
+    <h1 style="font-size:28px;margin-bottom:20px">AET Booking Tracker</h1>
+    <input type="password" id="pwd" style="width:100%;padding:12px;font-size:15px;border:1px solid #ddd;border-radius:8px;margin-bottom:15px;outline:none" placeholder="Access code" autofocus>
+    <button onclick="checkPwd()" style="width:100%;padding:12px;font-size:15px;background:#1a7a55;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600">Sign In</button>
+    <div id="err" style="color:red;font-size:13px;margin-top:10px;display:none">Wrong code</div>
+  </div>
+</div>
+
+
+<div class="page" id="appWrapper">
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
     <div>
       <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
@@ -1114,12 +1113,11 @@ window.logout = function() {
   }
 };
 </script>
-</div>
 
-<script>
-const PASSWORD = 'AET2024';
-function tryLogin() {
-  if (document.getElementById('pwd').value === PASSWORD) {
+// Password check
+function checkPwd() {
+  const pwd = 'AET2024';
+  if (document.getElementById('pwd').value === pwd) {
     sessionStorage.setItem('logged', '1');
     document.getElementById('login').style.display = 'none';
     document.getElementById('appWrapper').style.display = 'block';
@@ -1128,19 +1126,12 @@ function tryLogin() {
     document.getElementById('pwd').value = '';
   }
 }
-window.logout = function() {
-  if (confirm('Sign out?')) {
-    sessionStorage.removeItem('logged');
-    location.reload();
-  }
-}
+
 document.getElementById('pwd').addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') tryLogin();
+  if (e.key === 'Enter') checkPwd();
 });
+
 if (sessionStorage.getItem('logged')) {
   document.getElementById('login').style.display = 'none';
   document.getElementById('appWrapper').style.display = 'block';
 }
-</script>
-</body>
-</html>
