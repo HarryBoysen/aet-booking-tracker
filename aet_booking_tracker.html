@@ -172,7 +172,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="tab-panel active" id="panel-bookings">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:1rem">
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
-      <button class="btn" onclick="copyFollowUpList()" style="background:#fff3cd;border-color:#ffc107;color:#1a1a1a"><i class="ti ti-copy"></i> Copy Follow-up List</button>
       <button class="btn primary" onclick="openModal()"><i class="ti ti-plus"></i> New booking</button>
     </div>
     <div class="stats" id="stats"></div>
@@ -1203,34 +1202,3 @@ window.renderSops = function renderSops() {
 </script>
 </body>
 </html>
-
-/* Follow-up export */
-window.copyFollowUpList = function() {
-  const filtered = bookings.filter(b => {
-    const hasFollowUp = b.hotels && b.hotels.some(h => h.status === 'follow-up' || h.status === 'pending');
-    return hasFollowUp;
-  });
-  
-  if (filtered.length === 0) {
-    alert('No bookings with follow-up needed!');
-    return;
-  }
-  
-  let text = 'HOTELS NEEDING CONFIRMATION - ' + new Date().toLocaleDateString() + '\n\n';
-  
-  filtered.forEach(b => {
-    text += `${b.ref} - ${b.guest} (${b.agent})\n`;
-    b.hotels.forEach(h => {
-      if (h.status === 'follow-up' || h.status === 'pending') {
-        text += `  • ${h.name} (Check-in: ${h.checkin})\n`;
-      }
-    });
-    text += '\n';
-  });
-  
-  navigator.clipboard.writeText(text).then(() => {
-    alert('✅ Copied to clipboard!\n\nPaste into email to booking@evolutiontour.com');
-  }).catch(() => {
-    alert('Please copy manually:\n\n' + text);
-  });
-}
