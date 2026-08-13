@@ -66,6 +66,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .dep-required{background:#fef3e2;color:#7a4a00}
 .dep-paid{background:#e8f5e9;color:#2d6e2d}
 .dep-none{color:#ccc;font-size:11px}
+.via-agent{background:#eaf1fb;color:#1a4d8f}
+.via-direct{color:#ccc;font-size:11px}
 .days-warn{color:#a32d2d;font-weight:600}
 .days-ok{color:#aaa}
 .empty{text-align:center;padding:3rem;color:#999;font-size:13px}
@@ -538,15 +540,17 @@ window.render = function render() {
       const cur = (h.deposit && h.deposit.currency) || 'THB';
       let depHtml = '';
       if (h.deposit && h.deposit.required) {
-        if (h.deposit.paid) depHtml = `<span class="dep-badge dep-paid">✓ Paid${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''}</span>`;
-        else { const inf = h.deposit.informed ? '✓ Informed' : '! Not informed'; depHtml = `<span class="dep-badge dep-required">Deposit${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`; }
+        if (h.deposit.paid) depHtml = `<span class="dep-badge dep-paid">✓ Accounting Confirmed${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''}</span>`;
+        else { const inf = h.deposit.informed ? '✓ Agent Informed' : '! Agent Not Informed'; depHtml = `<span class="dep-badge dep-required">Deposit${h.deposit.amount ? ' '+h.deposit.amount+' '+cur : ''} · ${inf}</span>`; }
       } else depHtml = `<span class="dep-none">—</span>`;
+      const viaHtml = h.agentBooked ? `<span class="badge via-agent">Agent</span>` : `<span class="via-direct">Direct</span>`;
 
       return `<tr class="${alert ? 'hotel-alert' : ''}">
         <td><strong>${esc(h.name)}</strong></td>
         <td>${h.checkin || '—'}</td>
         <td>${h.rooms || 1}</td>
         <td>${statusBadge}</td>
+        <td>${viaHtml}</td>
         <td>${h.sent || '—'}</td>
         <td>${h.reply || '—'}</td>
         <td>${daysCell}</td>
@@ -581,7 +585,7 @@ window.render = function render() {
         </div>
       </div>
       ${isOpen ? `<div class="card-body"><table class="hotels-table">
-        <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Rooms</th><th>Status</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
+        <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Rooms</th><th>Status</th><th>Booked Via</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
         <tbody>${hotelsHtml}</tbody>
       </table></div>` : ''}
     </div>`;
@@ -641,6 +645,10 @@ window.addHotelBlock = function(h) {
       <div class="field"><label>Email Sent (Date)</label><input type="date" class="hf-sent" value="${h?h.sent:today}"></div>
     </div>
     <div class="row2"><div class="field"><label>Reply Received (Date)</label><input type="date" class="hf-reply" value="${h?h.reply:''}"></div></div>
+    <div class="checkbox-row" style="margin-top:6px">
+      <input type="checkbox" class="hf-agent-booked" id="agentbooked-${idx}" ${h&&h.agentBooked?'checked':''}>
+      <label for="agentbooked-${idx}" style="cursor:pointer">Booked via Travel Agent (not direct with hotel)</label>
+    </div>
     <div class="dep-section">
       <div class="dep-section-title">Deposit / Payment</div>
       <div class="checkbox-row">
@@ -664,10 +672,10 @@ window.addHotelBlock = function(h) {
             </div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-cc-informed" id="ccinf-${idx}" ${h&&h.creditcard&&h.creditcard.informed?'checked':''}><label for="ccinf-${idx}" style="cursor:pointer">Account Informed</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-informed" id="ccinf-${idx}" ${h&&h.creditcard&&h.creditcard.informed?'checked':''}><label for="ccinf-${idx}" style="cursor:pointer">Agent Informed</label></div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-cc-paid" id="ccpaid-${idx}" ${h&&h.creditcard&&h.creditcard.paid?'checked':''}><label for="ccpaid-${idx}" style="cursor:pointer">Account Paid</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-cc-paid" id="ccpaid-${idx}" ${h&&h.creditcard&&h.creditcard.paid?'checked':''}><label for="ccpaid-${idx}" style="cursor:pointer">Accounting Confirmed</label></div>
           </div>
         </div>
       </div>
@@ -684,10 +692,10 @@ window.addHotelBlock = function(h) {
             </div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}><label for="depinf-${idx}" style="cursor:pointer">Account Informed</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-dep-informed" id="depinf-${idx}" ${h&&h.deposit&&h.deposit.informed?'checked':''}><label for="depinf-${idx}" style="cursor:pointer">Agent Informed</label></div>
           </div>
           <div class="field" style="display:flex;align-items:flex-end;padding-bottom:4px">
-            <div class="checkbox-row"><input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}><label for="deppaid-${idx}" style="cursor:pointer">Account Paid</label></div>
+            <div class="checkbox-row"><input type="checkbox" class="hf-dep-paid" id="deppaid-${idx}" ${h&&h.deposit&&h.deposit.paid?'checked':''}><label for="deppaid-${idx}" style="cursor:pointer">Accounting Confirmed</label></div>
           </div>
         </div>
       </div>
@@ -720,6 +728,7 @@ window.saveBooking = async function() {
       status: block.querySelector('.hf-status').value,
       sent: block.querySelector('.hf-sent').value,
       reply: block.querySelector('.hf-reply').value,
+      agentBooked: block.querySelector('.hf-agent-booked').checked,
       deposit: {
         required: depReq,
         currency: depReq ? block.querySelector('.hf-dep-currency').value : 'THB',
@@ -782,10 +791,10 @@ window.copyFollowup = function(bookingId, hotelId, e) {
 }
 
 window.exportCSV = function() {
-  const rows = [['Ref','Agent','Partner','Guest','Hotel','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Account informed','Account paid','Archived']];
+  const rows = [['Ref','Agent','Partner','Guest','Hotel','Booked via Travel Agent','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Agent informed','Accounting confirmed','Archived']];
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
-      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
+      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.agentBooked?'Yes':'No', h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
         h.deposit.required?'Yes':'No', h.deposit.currency||'THB', h.deposit.amount||'', h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No', b.archived?'Yes':'No']);
     });
   });
