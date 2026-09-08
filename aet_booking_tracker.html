@@ -168,6 +168,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="top-tab" data-tab="stats" onclick="switchTab('stats-tab')"><i class="ti ti-chart-bar"></i> Response Stats</div>
     <div class="top-tab" data-tab="crm" onclick="switchTab('crm')"><i class="ti ti-users"></i> Partners &amp; Hotels</div>
     <div class="top-tab" data-tab="sop" onclick="switchTab('sop')"><i class="ti ti-book"></i> Playbook / SOPs</div>
+    <div class="top-tab" data-tab="allotments" onclick="switchTab('allotments')"><i class="ti ti-bed"></i> Allotments</div>
   </div>
 
   <!-- BOOKINGS TAB -->
@@ -239,6 +240,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="sop-cat-row" id="sopCatRow"></div>
     <div class="sop-list" id="sopList"></div>
     <div id="sopEmpty" class="empty" style="display:none">No SOPs yet — add the first one!</div>
+  </div>
+
+  <!-- ALLOTMENTS TAB -->
+  <div class="tab-panel" id="panel-allotments">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <button class="btn primary" onclick="openAllotmentModal()"><i class="ti ti-plus"></i> New Allotment</button>
+    </div>
+    <div class="stats" id="allotmentStats"></div>
+    <div class="toolbar">
+      <input type="text" id="allotmentSearch" placeholder="Search hotel..." oninput="renderAllotments()">
+    </div>
+    <div id="allotmentList"></div>
+    <div id="allotmentEmpty" class="empty" style="display:none">No allotments yet — add the first one!</div>
   </div>
 </div>
 
@@ -332,6 +346,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- Allotment Modal -->
+<div class="modal-bg" id="allotmentModal" onclick="bgClose(event,'allotmentModal')">
+<div class="modal">
+  <h2 id="allotmentModalTitle">New Allotment</h2>
+  <div class="field"><label>Hotel Name</label><input id="allot-hotel" placeholder="e.g. Rawi Warin Resort"></div>
+  <div class="section-divider">Room Types</div>
+  <div id="roomtype-blocks"></div>
+  <button type="button" class="add-hotel-btn" onclick="addRoomTypeBlock()"><i class="ti ti-plus"></i> Add Room Type</button>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('allotmentModal')">Cancel</button>
+    <button class="btn primary" onclick="saveAllotment()">Save Allotment</button>
+  </div>
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -353,6 +382,7 @@ let partners = [];
 let hotelsCrm = [];
 let sops = [];
 let trips = [];
+let allotments = [];
 
 let editId = null;
 let currentFilter = 'all';
@@ -364,6 +394,7 @@ let currentCrmDetail = null; // {type, id}
 let editingCrmId = null;
 let editingSopId = null;
 let sopCategoryFilter = '';
+let editingAllotmentId = null;
 
 document.getElementById('loading').style.display = 'none';
 if (!currentUser) {
@@ -392,6 +423,12 @@ function startApp() {
     bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     render();
     renderStats();
+    renderAllotments();
+  });
+  onSnapshot(collection(db, 'allotments'), (snap) => {
+    allotments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderAllotments();
+    refreshRoomTypeSuggestions();
   });
   onSnapshot(collection(db, 'partners'), (snap) => {
     partners = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -440,6 +477,7 @@ window.switchTab = function(tab) {
   if (tab === 'crm') { currentCrmDetail = null; document.getElementById('crmListView').style.display='block'; document.getElementById('crmDetailView').style.display='none'; renderCrm(); }
   if (tab === 'sop') renderSops();
   if (tab === 'stats-tab') renderStats();
+  if (tab === 'allotments') renderAllotments();
 }
 
 /* ---------- Helpers ---------- */
@@ -450,6 +488,134 @@ function bookingHasAlert(b) { return (b.hotels||[]).some(hotelNeedsFollowup); }
 function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
 function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ---------- Allotments ---------- */
+function allotmentBookedCount(hotelName, roomTypeName) {
+  const hn = (hotelName||'').trim().toLowerCase();
+  const rt = (roomTypeName||'').trim().toLowerCase();
+  const today = new Date(); today.setHours(0,0,0,0);
+  let count = 0;
+  bookings.forEach(b => {
+    if (b.archived) return;
+    (b.hotels||[]).forEach(h => {
+      if (h.status === 'cancelled') return;
+      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if ((h.roomType||'').trim().toLowerCase() !== rt) return;
+      if (h.checkout) { const co = new Date(h.checkout); co.setHours(0,0,0,0); if (co < today) return; }
+      count += parseInt(h.rooms) || 1;
+    });
+  });
+  return count;
+}
+
+window.refreshRoomTypeSuggestions = function() {
+  const hotelNames = [...new Set(allotments.map(a => a.hotelName).filter(Boolean))].sort();
+  const roomTypeNames = [...new Set(allotments.flatMap(a => (a.roomTypes||[]).map(rt => rt.name)).filter(Boolean))].sort();
+  let hotelDL = document.getElementById('allotmentHotelNames');
+  if (!hotelDL) { hotelDL = document.createElement('datalist'); hotelDL.id = 'allotmentHotelNames'; document.body.appendChild(hotelDL); }
+  hotelDL.innerHTML = hotelNames.map(n => `<option value="${esc(n)}">`).join('');
+  let rtDL = document.getElementById('roomTypeSuggestions');
+  if (!rtDL) { rtDL = document.createElement('datalist'); rtDL.id = 'roomTypeSuggestions'; document.body.appendChild(rtDL); }
+  rtDL.innerHTML = roomTypeNames.map(n => `<option value="${esc(n)}">`).join('');
+}
+
+window.renderAllotments = function() {
+  const searchEl = document.getElementById('allotmentSearch');
+  const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+  const filtered = allotments.filter(a => !q || (a.hotelName||'').toLowerCase().includes(q));
+  filtered.sort((a,b) => (a.hotelName||'').localeCompare(b.hotelName||''));
+
+  let totalTypes = 0, fullCount = 0, lowCount = 0;
+  const cardsHtml = filtered.map(a => {
+    const rows = (a.roomTypes||[]).map(rt => {
+      const booked = allotmentBookedCount(a.hotelName, rt.name);
+      const available = Math.max(rt.qty - booked, 0);
+      totalTypes++;
+      let statusBadge;
+      if (available <= 0) { statusBadge = `<span class="badge b-alert">Full</span>`; fullCount++; }
+      else if (available === 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
+      else { statusBadge = `<span class="badge b-confirmed">Available</span>`; }
+      return `<tr>
+        <td><strong>${esc(rt.name)}</strong></td>
+        <td>${rt.qty}</td>
+        <td>${booked}/${rt.qty}</td>
+        <td>${available}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="booking-card" style="margin-bottom:12px">
+      <div class="card-header" style="cursor:default">
+        <div class="card-title"><span class="card-ref">${esc(a.hotelName)}</span></div>
+        <div class="card-actions">
+          <button class="icon-btn" title="Edit" onclick="openAllotmentModal('${a.id}')"><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" title="Delete" onclick="deleteAllotment('${a.id}',event)" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <div class="card-body"><table class="hotels-table">
+        <thead><tr><th>Room Type</th><th>Allotment</th><th>Booked</th><th>Available</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div>`;
+  }).join('');
+
+  const statsEl = document.getElementById('allotmentStats');
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat"><div class="stat-label">Hotels with allotment</div><div class="stat-val">${allotments.length}</div></div>
+    <div class="stat"><div class="stat-label">Room types tracked</div><div class="stat-val">${totalTypes}</div></div>
+    <div class="stat"><div class="stat-label">Full (no availability)</div><div class="stat-val red">${fullCount}</div></div>
+    <div class="stat"><div class="stat-label">Low (1 left)</div><div class="stat-val amber">${lowCount}</div></div>
+  `;
+
+  const listEl = document.getElementById('allotmentList');
+  if (listEl) listEl.innerHTML = cardsHtml;
+  const emptyEl = document.getElementById('allotmentEmpty');
+  if (emptyEl) emptyEl.style.display = filtered.length === 0 ? 'block' : 'none';
+}
+
+window.addRoomTypeBlock = function(rt) {
+  const div = document.createElement('div');
+  div.className = 'row2 rt-block';
+  div.style.marginBottom = '8px';
+  div.innerHTML = `
+    <div class="field" style="margin-bottom:0"><input class="rt-name" placeholder="e.g. Deluxe" list="roomTypeSuggestions" value="${esc(rt?rt.name:'')}"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" min="1" class="rt-qty" placeholder="Qty" value="${rt&&rt.qty?rt.qty:''}" style="flex:1">
+      <button type="button" onclick="this.closest('.rt-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
+    </div>`;
+  document.getElementById('roomtype-blocks').appendChild(div);
+}
+
+window.openAllotmentModal = function(id) {
+  editingAllotmentId = id || null;
+  const a = id ? allotments.find(x => x.id === id) : null;
+  document.getElementById('allotmentModalTitle').textContent = a ? 'Edit allotment' : 'New allotment';
+  document.getElementById('allot-hotel').value = a ? a.hotelName : '';
+  document.getElementById('roomtype-blocks').innerHTML = '';
+  if (a && a.roomTypes && a.roomTypes.length > 0) a.roomTypes.forEach(rt => addRoomTypeBlock(rt));
+  else addRoomTypeBlock();
+  document.getElementById('allotmentModal').classList.add('open');
+}
+
+window.saveAllotment = async function() {
+  const hotelName = document.getElementById('allot-hotel').value.trim();
+  if (!hotelName) { alert('Please enter a hotel name.'); return; }
+  const roomTypes = [];
+  document.querySelectorAll('#roomtype-blocks .rt-block').forEach(block => {
+    const name = block.querySelector('.rt-name').value.trim();
+    const qty = parseInt(block.querySelector('.rt-qty').value) || 0;
+    if (name && qty > 0) roomTypes.push({ name, qty });
+  });
+  if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity.'); return; }
+  const id = editingAllotmentId || ('a_' + Date.now());
+  await setDoc(doc(db, 'allotments', id), { hotelName, roomTypes });
+  window.closeModal('allotmentModal');
+}
+
+window.deleteAllotment = async function(id, e) {
+  if (e) e.stopPropagation();
+  if (!confirm('Delete this allotment? This cannot be undone.')) return;
+  await deleteDoc(doc(db, 'allotments', id));
+}
 
 /* ---------- Bookings render ---------- */
 window.setFilter = function(f, el) {
@@ -545,8 +711,9 @@ window.render = function render() {
       } else depHtml = `<span class="dep-none">—</span>`;
       const viaHtml = h.agentBooked ? `<span class="badge via-agent">Agent</span>` : `<span class="via-direct">Direct</span>`;
 
+      const roomTypeSub = h.roomType ? `<div style="font-size:11px;color:#aaa;margin-top:2px">${esc(h.roomType)}</div>` : '';
       return `<tr class="${alert ? 'hotel-alert' : ''}">
-        <td><strong>${esc(h.name)}</strong></td>
+        <td><strong>${esc(h.name)}</strong>${roomTypeSub}</td>
         <td>${h.checkin || '—'}</td>
         <td>${h.rooms || 1}</td>
         <td>${statusBadge}</td>
@@ -628,7 +795,10 @@ window.addHotelBlock = function(h) {
     <div class="hotel-block-title">Hotel ${idx}
       <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
+    <div class="row2">
+      <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" list="allotmentHotelNames" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
+      <div class="field"><label>Room Type (optional, for allotment tracking)</label><input class="hf-roomtype" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(h?h.roomType:'')}"></div>
+    </div>
     <div class="row3">
       <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
       <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
@@ -722,6 +892,7 @@ window.saveBooking = async function() {
     const ccReq = block.querySelector('.hf-cc-req').checked;
     hotels.push({
       id: block.dataset.hid, name,
+      roomType: block.querySelector('.hf-roomtype').value.trim(),
       checkin: block.querySelector('.hf-checkin').value,
       checkout: block.querySelector('.hf-checkout').value,
       rooms: parseInt(block.querySelector('.hf-rooms').value) || 1,
@@ -791,10 +962,10 @@ window.copyFollowup = function(bookingId, hotelId, e) {
 }
 
 window.exportCSV = function() {
-  const rows = [['Ref','Agent','Partner','Guest','Hotel','Booked via Travel Agent','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Agent informed','Accounting confirmed','Archived']];
+  const rows = [['Ref','Agent','Partner','Guest','Hotel','Room Type','Booked via Travel Agent','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Agent informed','Accounting confirmed','Archived']];
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
-      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.agentBooked?'Yes':'No', h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
+      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.roomType||'', h.agentBooked?'Yes':'No', h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
         h.deposit.required?'Yes':'No', h.deposit.currency||'THB', h.deposit.amount||'', h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No', b.archived?'Yes':'No']);
     });
   });
