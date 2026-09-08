@@ -248,9 +248,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       <button class="btn primary" onclick="openAllotmentModal()"><i class="ti ti-plus"></i> New Allotment</button>
     </div>
     <div class="stats" id="allotmentStats"></div>
-    <div class="toolbar">
+    <div class="toolbar" style="flex-wrap:wrap">
       <input type="text" id="allotmentSearch" placeholder="Search hotel..." oninput="renderAllotments()">
+      <span style="font-size:13px;color:#888">Check period:</span>
+      <input type="date" id="allotmentDateFrom" onchange="renderAllotments()">
+      <span style="font-size:13px;color:#888">to</span>
+      <input type="date" id="allotmentDateTo" onchange="renderAllotments()">
+      <button class="btn" onclick="clearAllotmentDateRange()"><i class="ti ti-x"></i> Clear</button>
     </div>
+    <div id="allotmentRangeNote" style="font-size:12px;color:#888;margin:-8px 0 12px"></div>
     <div id="allotmentList"></div>
     <div id="allotmentEmpty" class="empty" style="display:none">No allotments yet — add the first one!</div>
   </div>
@@ -490,7 +496,7 @@ function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.cred
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Allotments ---------- */
-function allotmentBookedCount(hotelName, roomTypeName) {
+function allotmentBookedCount(hotelName, roomTypeName, rangeStart, rangeEnd) {
   const hn = (hotelName||'').trim().toLowerCase();
   const rt = (roomTypeName||'').trim().toLowerCase();
   const today = new Date(); today.setHours(0,0,0,0);
@@ -501,7 +507,19 @@ function allotmentBookedCount(hotelName, roomTypeName) {
       if (h.status === 'cancelled') return;
       if ((h.name||'').trim().toLowerCase() !== hn) return;
       if ((h.roomType||'').trim().toLowerCase() !== rt) return;
-      if (h.checkout) { const co = new Date(h.checkout); co.setHours(0,0,0,0); if (co < today) return; }
+      const ci = h.checkin ? new Date(h.checkin) : null;
+      const co = h.checkout ? new Date(h.checkout) : null;
+      if (ci) ci.setHours(0,0,0,0);
+      if (co) co.setHours(0,0,0,0);
+      if (rangeStart && rangeEnd) {
+        // Checking a specific period: count only bookings whose stay overlaps that period.
+        // A booking with no check-in/check-out date can't be checked against a period, so it's skipped here.
+        if (!ci || !co) return;
+        if (co <= rangeStart || ci >= rangeEnd) return; // no overlap
+      } else {
+        // No period selected: show everything currently active or still upcoming.
+        if (co && co < today) return;
+      }
       count += parseInt(h.rooms) || 1;
     });
   });
@@ -519,21 +537,47 @@ window.refreshRoomTypeSuggestions = function() {
   rtDL.innerHTML = roomTypeNames.map(n => `<option value="${esc(n)}">`).join('');
 }
 
+window.clearAllotmentDateRange = function() {
+  document.getElementById('allotmentDateFrom').value = '';
+  document.getElementById('allotmentDateTo').value = '';
+  renderAllotments();
+}
+
 window.renderAllotments = function() {
   const searchEl = document.getElementById('allotmentSearch');
   const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
   const filtered = allotments.filter(a => !q || (a.hotelName||'').toLowerCase().includes(q));
   filtered.sort((a,b) => (a.hotelName||'').localeCompare(b.hotelName||''));
 
+  const fromEl = document.getElementById('allotmentDateFrom');
+  const toEl = document.getElementById('allotmentDateTo');
+  const fromVal = fromEl ? fromEl.value : '';
+  const toVal = toEl ? toEl.value : '';
+  let rangeStart = null, rangeEnd = null;
+  const noteEl = document.getElementById('allotmentRangeNote');
+  if (fromVal && toVal) {
+    rangeStart = new Date(fromVal); rangeStart.setHours(0,0,0,0);
+    rangeEnd = new Date(toVal); rangeEnd.setHours(0,0,0,0);
+    if (rangeEnd <= rangeStart) {
+      if (noteEl) noteEl.innerHTML = `<span style="color:#a32d2d">"To" date must be after "From" date.</span>`;
+      rangeStart = null; rangeEnd = null;
+    } else if (noteEl) {
+      noteEl.textContent = `Showing availability for ${fromVal} → ${toVal} (bookings with no check-in/check-out date can't be matched to a period and are excluded).`;
+    }
+  } else {
+    if (fromVal || toVal) { if (noteEl) noteEl.textContent = 'Pick both a "from" and "to" date to check a specific period.'; }
+    else if (noteEl) noteEl.textContent = 'Showing all current & upcoming bookings. Pick a period above to check a specific date range.';
+  }
+
   let totalTypes = 0, fullCount = 0, lowCount = 0;
   const cardsHtml = filtered.map(a => {
     const rows = (a.roomTypes||[]).map(rt => {
-      const booked = allotmentBookedCount(a.hotelName, rt.name);
+      const booked = allotmentBookedCount(a.hotelName, rt.name, rangeStart, rangeEnd);
       const available = Math.max(rt.qty - booked, 0);
       totalTypes++;
       let statusBadge;
-      if (available <= 0) { statusBadge = `<span class="badge b-alert">Full</span>`; fullCount++; }
-      else if (available === 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
+      if (booked >= rt.qty) { statusBadge = `<span class="badge b-alert">Full</span>`; fullCount++; }
+      else if (booked > 0 && available <= 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
       else { statusBadge = `<span class="badge b-confirmed">Available</span>`; }
       return `<tr>
         <td><strong>${esc(rt.name)}</strong></td>
