@@ -200,7 +200,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- STATS TAB -->
   <div class="tab-panel" id="panel-stats-tab">
-    <div style="font-size:13px;color:#888;margin-bottom:1rem">Average hotel response time = days between "Email sent" and "Reply received". Room nights = days between Check-in and Check-out, multiplied by number of rooms. Based on all bookings (active + archived).</div>
+    <div style="font-size:13px;color:#888;margin-bottom:1rem">Room nights = days between Check-in and Check-out, multiplied by number of rooms. Based on all bookings (active + archived).</div>
     <div class="stats" style="margin-bottom:1rem">
       <div class="stat"><div class="stat-label">Total room nights booked</div><div class="stat-val" id="totalNightsStat">0</div></div>
     </div>
@@ -356,7 +356,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal-bg" id="allotmentModal" onclick="bgClose(event,'allotmentModal')">
 <div class="modal">
   <h2 id="allotmentModalTitle">New Allotment</h2>
-  <div class="field"><label>Hotel Name</label><input id="allot-hotel" placeholder="e.g. Rawi Warin Resort"></div>
+  <div class="row2">
+    <div class="field"><label>Hotel Name</label><input id="allot-hotel" placeholder="e.g. Rawi Warin Resort"></div>
+    <div class="field"><label>Destination</label><input id="allot-destination" list="allotmentDestinations" placeholder="e.g. Koh Lanta"></div>
+  </div>
   <div class="section-divider">Room Types</div>
   <div id="roomtype-blocks"></div>
   <button type="button" class="add-hotel-btn" onclick="addRoomTypeBlock()"><i class="ti ti-plus"></i> Add Room Type</button>
@@ -393,6 +396,9 @@ let allotments = [];
 let editId = null;
 let currentFilter = 'all';
 let expandedCards = new Set();
+let expandedAllotments = new Set();
+let expandedStatsHotels = new Set();
+let lastStatsRows = [];
 let currentUser = localStorage.getItem('aet_username') || '';
 let hotelCount = 0;
 let crmType = 'partners'; // 'partners' | 'hotels'
@@ -496,34 +502,79 @@ function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.cred
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Allotments ---------- */
-function allotmentBookedCount(hotelName, roomTypeName, rangeStart, rangeEnd) {
+// Booked count = the PEAK number of rooms needed on any single night within the window being
+// checked — not a flat sum of every future booking. A hotel with 2 rooms allotted can easily
+// have 10 bookings across the year without ever being "Full", as long as no two of them overlap
+// on the same night. Summing them all would (and previously did) falsely show "Full" for a hotel
+// that's actually wide open on every date except the ones that truly overlap.
+// Implemented as a sweep-line: each stay becomes a +rooms event at check-in and a -rooms event at
+// check-out (checkout day itself is not occupied — half-open interval), then we track the running
+// total room-by-room in date order and return its highest point.
+function allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd) {
   const hn = (hotelName||'').trim().toLowerCase();
   const rt = (roomTypeName||'').trim().toLowerCase();
   const today = new Date(); today.setHours(0,0,0,0);
-  let count = 0;
+  const windowStart = rangeStart || today;
+  const windowEnd = rangeEnd || null; // null = open-ended into the future
+
+  const events = [];
   bookings.forEach(b => {
     // Note: archived bookings are NOT excluded here — in this tracker "archived" means
     // "all hotels confirmed", not "stay completed", so an archived booking can still be
-    // a future, active reservation that occupies the allotment. Past stays are already
-    // filtered out below via the check-out date, and cancelled hotel lines are skipped.
+    // a future, active reservation that occupies the allotment.
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
       if ((h.name||'').trim().toLowerCase() !== hn) return;
       if ((h.roomType||'').trim().toLowerCase() !== rt) return;
-      const ci = h.checkin ? new Date(h.checkin) : null;
-      const co = h.checkout ? new Date(h.checkout) : null;
-      if (ci) ci.setHours(0,0,0,0);
-      if (co) co.setHours(0,0,0,0);
-      if (rangeStart && rangeEnd) {
-        // Checking a specific period: count only bookings whose stay overlaps that period.
-        // A booking with no check-in/check-out date can't be checked against a period, so it's skipped here.
-        if (!ci || !co) return;
-        if (co <= rangeStart || ci >= rangeEnd) return; // no overlap
-      } else {
-        // No period selected: show everything currently active or still upcoming.
-        if (co && co < today) return;
-      }
-      count += parseInt(h.rooms) || 1;
+      if (!h.checkin || !h.checkout) return; // can't place it on the calendar — see allotmentDateIssuesCount
+      const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
+      const co = new Date(h.checkout); co.setHours(0,0,0,0);
+      if (co <= ci) return; // bad data (checkout not after checkin) — see allotmentDateIssuesCount
+      const start = ci < windowStart ? windowStart : ci;
+      const end = (windowEnd && co > windowEnd) ? windowEnd : co;
+      if (start >= end) return; // stay doesn't overlap the window being checked
+      const rooms = parseInt(h.rooms) || 1;
+      events.push({ date: start, delta: rooms });
+      events.push({ date: end, delta: -rooms });
+    });
+  });
+  // Sort by date; on a tie, process checkouts (-) before checkins (+) so a same-day
+  // turnover doesn't get counted as briefly overlapping.
+  events.sort((a,b) => a.date - b.date || a.delta - b.delta);
+
+  let running = 0, peak = 0, peakDate = null;
+  events.forEach(e => {
+    running += e.delta;
+    if (running > peak) { peak = running; peakDate = e.date; }
+  });
+  return { peak, peakDate };
+}
+
+// Booked count = the PEAK number of rooms needed on any single night within the window being
+// checked — not a flat sum of every future booking. A hotel with 2 rooms allotted can easily
+// have 10 bookings across the year without ever being "Full", as long as no two of them overlap
+// on the same night. Summing them all would (and previously did) falsely show "Full" for a hotel
+// that's actually wide open on every date except the ones that truly overlap. See allotmentPeakInfo
+// for the sweep-line that computes this and the date it happens on.
+function allotmentBookedCount(hotelName, roomTypeName, rangeStart, rangeEnd) {
+  return allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd).peak;
+}
+
+// Bookings at this hotel that can't be placed on the calendar (missing check-in/check-out,
+// or a checkout that isn't after the check-in) — these are excluded from the count above rather
+// than risk showing a wrong number, so they're surfaced here instead as a data-quality warning.
+function allotmentDateIssuesCount(hotelName) {
+  const hn = (hotelName||'').trim().toLowerCase();
+  let count = 0;
+  bookings.forEach(b => {
+    (b.hotels||[]).forEach(h => {
+      if (h.status === 'cancelled') return;
+      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if (!(h.roomType||'').trim()) return; // already covered by the "no Room Type" warning
+      if (!h.checkin || !h.checkout) { count++; return; }
+      const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
+      const co = new Date(h.checkout); co.setHours(0,0,0,0);
+      if (co <= ci) count++;
     });
   });
   return count;
@@ -556,15 +607,54 @@ function allotmentUntaggedCount(hotelName, rangeStart, rangeEnd) {
   return count;
 }
 
+// The individual bookings that make up an allotment's "Booked" count — shown when a
+// hotel card is expanded, so the team can see exactly which bookings occupy the allotment.
+function allotmentBookingsList(hotelName, rangeStart, rangeEnd) {
+  const hn = (hotelName||'').trim().toLowerCase();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const list = [];
+  bookings.forEach(b => {
+    (b.hotels||[]).forEach(h => {
+      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      const ci = h.checkin ? new Date(h.checkin) : null;
+      const co = h.checkout ? new Date(h.checkout) : null;
+      if (ci) ci.setHours(0,0,0,0);
+      if (co) co.setHours(0,0,0,0);
+      if (rangeStart && rangeEnd) {
+        if (!ci || !co) return;
+        if (co <= rangeStart || ci >= rangeEnd) return;
+      } else {
+        if (h.status !== 'cancelled' && co && co < today) return;
+      }
+      list.push({
+        ref: b.ref || '', guest: b.guest || '',
+        roomType: h.roomType || '', checkin: h.checkin || '', checkout: h.checkout || '',
+        rooms: h.rooms || 1, status: h.status || ''
+      });
+    });
+  });
+  list.sort((a,b) => (a.checkin||'').localeCompare(b.checkin||''));
+  return list;
+}
+
+window.toggleAllotmentExpand = function(id) {
+  if (expandedAllotments.has(id)) expandedAllotments.delete(id); else expandedAllotments.add(id);
+  renderAllotments();
+}
+
 window.refreshRoomTypeSuggestions = function() {
   const hotelNames = [...new Set(allotments.map(a => a.hotelName).filter(Boolean))].sort();
   const roomTypeNames = [...new Set(allotments.flatMap(a => (a.roomTypes||[]).map(rt => rt.name)).filter(Boolean))].sort();
+  const destinationNames = [...new Set(allotments.map(a => a.destination).filter(Boolean))].sort();
   let hotelDL = document.getElementById('allotmentHotelNames');
   if (!hotelDL) { hotelDL = document.createElement('datalist'); hotelDL.id = 'allotmentHotelNames'; document.body.appendChild(hotelDL); }
   hotelDL.innerHTML = hotelNames.map(n => `<option value="${esc(n)}">`).join('');
   let rtDL = document.getElementById('roomTypeSuggestions');
   if (!rtDL) { rtDL = document.createElement('datalist'); rtDL.id = 'roomTypeSuggestions'; document.body.appendChild(rtDL); }
   rtDL.innerHTML = roomTypeNames.map(n => `<option value="${esc(n)}">`).join('');
+  let destDL = document.getElementById('allotmentDestinations');
+  if (!destDL) { destDL = document.createElement('datalist'); destDL.id = 'allotmentDestinations'; document.body.appendChild(destDL); }
+  destDL.innerHTML = destinationNames.map(n => `<option value="${esc(n)}">`).join('');
 }
 
 window.clearAllotmentDateRange = function() {
@@ -600,13 +690,20 @@ window.renderAllotments = function() {
   }
 
   let totalTypes = 0, fullCount = 0, lowCount = 0;
-  const cardsHtml = filtered.map(a => {
+
+  const buildCard = (a) => {
     const rows = (a.roomTypes||[]).map(rt => {
-      const booked = allotmentBookedCount(a.hotelName, rt.name, rangeStart, rangeEnd);
+      const { peak: booked, peakDate } = allotmentPeakInfo(a.hotelName, rt.name, rangeStart, rangeEnd);
       const available = Math.max(rt.qty - booked, 0);
       totalTypes++;
       let statusBadge;
-      if (booked >= rt.qty) { statusBadge = `<span class="badge b-alert">Full</span>`; fullCount++; }
+      if (booked >= rt.qty) {
+        // Show the date the peak actually occurs on — "Full" over an open-ended future window
+        // can otherwise be misread as "sold out from now on", when it may just be one busy night.
+        const dateStr = peakDate ? peakDate.toISOString().split('T')[0] : '';
+        statusBadge = `<span class="badge b-alert">Full${dateStr ? ' (from '+dateStr+')' : ''}</span>`;
+        fullCount++;
+      }
       else if (booked > 0 && available <= 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
       else { statusBadge = `<span class="badge b-confirmed">Available</span>`; }
       return `<tr>
@@ -621,12 +718,40 @@ window.renderAllotments = function() {
     const untaggedNote = untagged > 0
       ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${untagged} booking${untagged>1?'s':''} at this hotel ${rangeStart?'in this period ':''}${untagged>1?'have':'has'} no Room Type set, so ${untagged>1?"they're":"it's"} not counted above — open the booking and set Room Type on that hotel line.</div>`
       : '';
+    const dateIssues = allotmentDateIssuesCount(a.hotelName);
+    const dateIssuesNote = dateIssues > 0
+      ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${dateIssues} booking${dateIssues>1?'s':''} at this hotel ${dateIssues>1?'have':'has'} a missing or invalid check-in/check-out date, so ${dateIssues>1?"they're":"it's"} not counted above — open the booking and check the dates on that hotel line.</div>`
+      : '';
+
+    const isExpanded = expandedAllotments.has(a.id);
+    let bookingsListHtml = '';
+    if (isExpanded) {
+      const list = allotmentBookingsList(a.hotelName, rangeStart, rangeEnd);
+      bookingsListHtml = list.length === 0
+        ? `<div style="padding:12px 14px;font-size:12px;color:#888;border-top:0.5px solid #f0f0ec">No bookings found for this hotel${rangeStart?' in this period':''}.</div>`
+        : `<div style="border-top:0.5px solid #f0f0ec;overflow-x:auto"><table class="hotels-table" style="min-width:600px">
+            <thead><tr><th>Ref</th><th>Guest</th><th>Room Type</th><th>Check-in</th><th>Check-out</th><th>Rooms</th><th>Status</th></tr></thead>
+            <tbody>${list.map(x => `<tr${x.status==='cancelled'?' style="opacity:0.5;text-decoration:line-through"':''}>
+              <td>${esc(x.ref)}</td>
+              <td>${esc(x.guest)}</td>
+              <td>${esc(x.roomType||'—')}</td>
+              <td>${esc(x.checkin||'—')}</td>
+              <td>${esc(x.checkout||'—')}</td>
+              <td>${x.rooms}</td>
+              <td>${esc(x.status||'—')}</td>
+            </tr>`).join('')}</tbody>
+          </table></div>`;
+    }
+
     return `<div class="booking-card" style="margin-bottom:12px">
-      <div class="card-header" style="cursor:default">
-        <div class="card-title"><span class="card-ref">${esc(a.hotelName)}</span></div>
-        <div class="card-actions">
+      <div class="card-header" onclick="toggleAllotmentExpand('${a.id}')">
+        <div class="card-title">
+          <span class="card-ref">${esc(a.hotelName)}</span>
+        </div>
+        <div class="card-actions" onclick="event.stopPropagation()">
           <button class="icon-btn" title="Edit" onclick="openAllotmentModal('${a.id}')"><i class="ti ti-edit"></i></button>
           <button class="icon-btn" title="Delete" onclick="deleteAllotment('${a.id}',event)" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
+          <i class="ti ti-chevron-down chevron ${isExpanded ? 'open' : ''}"></i>
         </div>
       </div>
       <div class="card-body"><table class="hotels-table">
@@ -634,6 +759,35 @@ window.renderAllotments = function() {
         <tbody>${rows}</tbody>
       </table></div>
       ${untaggedNote}
+      ${dateIssuesNote}
+      ${bookingsListHtml}
+    </div>`;
+  };
+
+  // Total rooms currently booked for a hotel (summed across its room types) — used to sort
+  // the busiest hotels to the top, so this stays useful even before every hotel has a Destination set.
+  const totalBookedFor = (a) => (a.roomTypes||[]).reduce((sum, rt) => sum + allotmentBookedCount(a.hotelName, rt.name, rangeStart, rangeEnd), 0);
+
+  // Group hotels by destination so the team can scan allotment by area (Koh Lanta, Bangkok, etc.).
+  // Hotels with no Destination set yet fall into "Other" rather than blocking the view.
+  const groups = {};
+  filtered.forEach(a => {
+    const dest = (a.destination||'').trim() || 'Other';
+    if (!groups[dest]) groups[dest] = [];
+    groups[dest].push(a);
+  });
+  const destNames = Object.keys(groups).sort((x,y) => {
+    if (x === 'Other') return 1;
+    if (y === 'Other') return -1;
+    return x.localeCompare(y);
+  });
+
+  const cardsHtml = destNames.map(dest => {
+    // Within each destination, busiest hotels (most rooms currently booked) float to the top.
+    const hotelsInDest = groups[dest].slice().sort((a,b) => totalBookedFor(b) - totalBookedFor(a) || (a.hotelName||'').localeCompare(b.hotelName||''));
+    return `<div class="allotment-dest-group" style="margin-bottom:22px">
+      <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:0.04em;color:#888;margin:0 0 10px;font-weight:600">${esc(dest)}</h3>
+      ${hotelsInDest.map(buildCard).join('')}
     </div>`;
   }).join('');
 
@@ -669,6 +823,7 @@ window.openAllotmentModal = function(id) {
   const a = id ? allotments.find(x => x.id === id) : null;
   document.getElementById('allotmentModalTitle').textContent = a ? 'Edit allotment' : 'New allotment';
   document.getElementById('allot-hotel').value = a ? a.hotelName : '';
+  document.getElementById('allot-destination').value = a ? (a.destination||'') : '';
   document.getElementById('roomtype-blocks').innerHTML = '';
   if (a && a.roomTypes && a.roomTypes.length > 0) a.roomTypes.forEach(rt => addRoomTypeBlock(rt));
   else addRoomTypeBlock();
@@ -678,6 +833,7 @@ window.openAllotmentModal = function(id) {
 window.saveAllotment = async function() {
   const hotelName = document.getElementById('allot-hotel').value.trim();
   if (!hotelName) { alert('Please enter a hotel name.'); return; }
+  const destination = document.getElementById('allot-destination').value.trim();
   const roomTypes = [];
   document.querySelectorAll('#roomtype-blocks .rt-block').forEach(block => {
     const name = block.querySelector('.rt-name').value.trim();
@@ -686,7 +842,7 @@ window.saveAllotment = async function() {
   });
   if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity.'); return; }
   const id = editingAllotmentId || ('a_' + Date.now());
-  await setDoc(doc(db, 'allotments', id), { hotelName, roomTypes });
+  await setDoc(doc(db, 'allotments', id), { hotelName, destination, roomTypes });
   window.closeModal('allotmentModal');
 }
 
@@ -1063,11 +1219,41 @@ function showToast(msg) {
 }
 
 /* ---------- Response Stats ---------- */
+// The individual bookings behind a hotel's "Bookings counted" number in Response Stats —
+// shown when that row is expanded. Mirrors the exact same filters used to build the count,
+// so the number of rows shown always matches the count in the row above it.
+function statsBookingsList(hotelName, yearFilter) {
+  const list = [];
+  bookings.forEach(b => {
+    (b.hotels||[]).forEach(h => {
+      const key = (h.name||'Unknown').trim();
+      if (key !== hotelName) return;
+      if (yearFilter && h.checkin) {
+        const checkinYear = h.checkin.split('-')[0];
+        if (checkinYear !== yearFilter) return;
+      }
+      const nights = daysBetween(h.checkin, h.checkout);
+      const rooms = h.rooms || 1;
+      const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
+      list.push({ ref: b.ref||'', guest: b.guest||'', checkin: h.checkin||'', checkout: h.checkout||'', rooms, nights: validNights, status: h.status||'' });
+    });
+  });
+  list.sort((a,b) => (a.checkin||'').localeCompare(b.checkin||''));
+  return list;
+}
+
+window.toggleStatsExpand = function(idx) {
+  const row = lastStatsRows[idx];
+  if (!row) return;
+  if (expandedStatsHotels.has(row.name)) expandedStatsHotels.delete(row.name); else expandedStatsHotels.add(row.name);
+  renderStats();
+}
+
 window.renderStats = function() {
   const q = (document.getElementById('statsSearch') ? document.getElementById('statsSearch').value : '').toLowerCase();
   const yearFilter = document.getElementById('statsYearFilter') ? document.getElementById('statsYearFilter').value : '';
   
-  const map = {}; // hotelName -> {total, count, max, min, nights}
+  const map = {}; // hotelName -> {count, nights}
   let totalNightsAll = 0;
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
@@ -1075,49 +1261,61 @@ window.renderStats = function() {
       const nights = daysBetween(h.checkin, h.checkout);
       const rooms = h.rooms || 1;
       const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
-      
+
       // Filter by year if selected
       if (yearFilter && h.checkin) {
         const checkinYear = h.checkin.split('-')[0];
         if (checkinYear !== yearFilter) return;
       }
-      
+
       if (validNights > 0) totalNightsAll += validNights;
 
-      const d = daysBetween(h.sent, h.reply);
-      if (!map[key]) map[key] = { total: 0, count: 0, max: 0, min: Infinity, nights: 0 };
+      if (!map[key]) map[key] = { count: 0, nights: 0 };
       map[key].nights += validNights;
-      if (d === null || d < 0) return;
-      map[key].total += d; map[key].count++;
-      map[key].max = Math.max(map[key].max, d);
-      map[key].min = Math.min(map[key].min, d);
+      map[key].count++;
     });
   });
   let rows = Object.keys(map).map(name => ({
-    name, nights: map[name].nights,
-    avg: map[name].count ? (map[name].total/map[name].count) : null,
-    count: map[name].count, max: map[name].max, min: map[name].min
+    name, nights: map[name].nights, count: map[name].count
   }));
   if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
-  rows.sort((a,b) => (b.avg||0) - (a.avg||0));
+  rows.sort((a,b) => (b.nights||0) - (a.nights||0));
+  lastStatsRows = rows;
 
   const wrap = document.getElementById('statsTableWrap');
   const yearLabel = yearFilter ? ` (${yearFilter})` : '';
   document.getElementById('totalNightsStat').textContent = totalNightsAll;
 
-  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out and reply dates filled in.</div>'; return; }
+  if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out dates filled in.</div>'; return; }
 
   wrap.innerHTML = `<div class="table-wrap" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow-x:auto">
-    <table class="hotels-table" style="min-width:700px">
-      <thead><tr><th>Hotel / Supplier</th><th>Avg. response (days)</th><th>Fastest</th><th>Slowest</th><th>Bookings counted</th><th>Room nights${yearLabel}</th></tr></thead>
-      <tbody>${rows.map(r => `<tr>
-        <td><strong>${esc(r.name)}</strong></td>
-        <td>${r.avg!==null ? r.avg.toFixed(1) + ' days ' + (r.avg>=2 ? '<span class="dep-badge dep-required" style="margin-left:6px">Slow</span>' : '<span class="dep-badge dep-paid" style="margin-left:6px">Fast</span>') : '—'}</td>
-        <td>${r.avg!==null ? r.min + ' d' : '—'}</td>
-        <td>${r.avg!==null ? r.max + ' d' : '—'}</td>
-        <td>${r.count}</td>
-        <td><strong>${r.nights}</strong></td>
-      </tr>`).join('')}</tbody>
+    <table class="hotels-table" style="min-width:500px">
+      <thead><tr><th>Hotel / Supplier</th><th>Bookings counted</th><th>Room nights${yearLabel}</th></tr></thead>
+      <tbody>${rows.map((r,i) => {
+        const isExpanded = expandedStatsHotels.has(r.name);
+        const mainRow = `<tr style="cursor:pointer" onclick="toggleStatsExpand(${i})">
+          <td><i class="ti ti-chevron-down chevron ${isExpanded?'open':''}" style="margin-right:6px;font-size:14px"></i><strong>${esc(r.name)}</strong></td>
+          <td>${r.count}</td>
+          <td><strong>${r.nights}</strong></td>
+        </tr>`;
+        if (!isExpanded) return mainRow;
+        const list = statsBookingsList(r.name, yearFilter);
+        const detailRow = `<tr><td colspan="3" style="padding:0;background:#fafaf8">
+          <table class="hotels-table" style="width:100%">
+            <thead><tr><th>Ref</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Rooms</th><th>Nights</th><th>Status</th></tr></thead>
+            <tbody>${list.length ? list.map(x => `<tr${x.status==='cancelled'?' style="opacity:0.5;text-decoration:line-through"':''}>
+              <td>${esc(x.ref)}</td>
+              <td>${esc(x.guest)}</td>
+              <td>${esc(x.checkin||'—')}</td>
+              <td>${esc(x.checkout||'—')}</td>
+              <td>${x.rooms}</td>
+              <td>${x.nights}</td>
+              <td>${esc(x.status||'—')}</td>
+            </tr>`).join('') : `<tr><td colspan="7" style="color:#888">No bookings found.</td></tr>`}</tbody>
+          </table>
+        </td></tr>`;
+        return mainRow + detailRow;
+      }).join('')}</tbody>
     </table>
   </div>`;
 }
