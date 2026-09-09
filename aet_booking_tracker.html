@@ -655,6 +655,32 @@ function allotmentBookingsList(a, rangeStart, rangeEnd) {
   return list;
 }
 
+// Proactively catches the exact bug reported for "Baan Chaweng Beach Resort" vs "...and Spa":
+// a booking hotel name that looks like the same hotel as this allotment, but isn't matched by
+// its hotelName or existing aliases — meaning those bookings are silently missing from the
+// counts above. Runs for every allotment on every render, so a mismatch surfaces immediately
+// instead of only being noticed when someone asks why a hotel shows unexpectedly available.
+function allotmentMissingAliasSuggestions(a) {
+  const covered = allotmentNameSet(a);
+  const allBookingNames = [...new Set(bookings.flatMap(b => (b.hotels||[]).map(h => (h.name||'').trim())).filter(Boolean))];
+  const groups = findPossibleDuplicateHotelNames([a.hotelName, ...allBookingNames]);
+  const group = groups.find(g => g.some(n => n.toLowerCase() === (a.hotelName||'').trim().toLowerCase()));
+  if (!group) return [];
+  return group.filter(n => !covered.has(n.trim().toLowerCase()));
+}
+
+// One-click fix for the warning above — adds the suggested spelling as an alias immediately,
+// no need to open the Edit modal.
+window.addAliasToAllotmentDirect = async function(id, name, e) {
+  if (e) e.stopPropagation();
+  const a = allotments.find(x => x.id === id);
+  if (!a) return;
+  const aliases = (a.aliases||[]).slice();
+  if (!aliases.some(x => x.toLowerCase() === name.toLowerCase())) aliases.push(name);
+  await setDoc(doc(db, 'allotments', id), { ...a, aliases });
+  showToast(`✅ Added "${name}" as an alias — its bookings now count`);
+}
+
 window.toggleAllotmentExpand = function(id) {
   if (expandedAllotments.has(id)) expandedAllotments.delete(id); else expandedAllotments.add(id);
   renderAllotments();
@@ -740,6 +766,10 @@ window.renderAllotments = function() {
     const dateIssuesNote = dateIssues > 0
       ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${dateIssues} booking${dateIssues>1?'s':''} at this hotel ${dateIssues>1?'have':'has'} a missing or invalid check-in/check-out date, so ${dateIssues>1?"they're":"it's"} not counted above — open the booking and check the dates on that hotel line.</div>`
       : '';
+    const missingAliases = allotmentMissingAliasSuggestions(a);
+    const missingAliasNote = missingAliases.length > 0
+      ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec" onclick="event.stopPropagation()">⚠ Found ${missingAliases.map(n => `"${esc(n)}"`).join(', ')} in your bookings — looks like the same hotel, but not counted above yet. ${missingAliases.map(n => `<button class="btn" style="padding:2px 8px;font-size:11px;margin-left:4px" onclick="addAliasToAllotmentDirect('${a.id}','${n.replace(/'/g,"\\'")}',event)">+ Add as alias</button>`).join(' ')}</div>`
+      : '';
 
     const isExpanded = expandedAllotments.has(a.id);
     let bookingsListHtml = '';
@@ -779,6 +809,7 @@ window.renderAllotments = function() {
       </table></div>
       ${untaggedNote}
       ${dateIssuesNote}
+      ${missingAliasNote}
       ${bookingsListHtml}
     </div>`;
   };
