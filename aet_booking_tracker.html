@@ -252,7 +252,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="toolbar" style="flex-wrap:wrap">
       <input type="text" id="allotmentSearch" placeholder="Search hotel..." oninput="renderAllotments()">
       <span style="font-size:13px;color:#888">Check period:</span>
-      <input type="date" id="allotmentDateFrom" onchange="renderAllotments()">
+      <input type="date" id="allotmentDateFrom" onchange="onAllotmentDateFromChange()">
       <span style="font-size:13px;color:#888">to</span>
       <input type="date" id="allotmentDateTo" onchange="renderAllotments()">
       <button class="btn" onclick="clearAllotmentDateRange()"><i class="ti ti-x"></i> Clear</button>
@@ -707,6 +707,20 @@ window.clearAllotmentDateRange = function() {
   renderAllotments();
 }
 
+// Same UX as the booking form: picking "from" points "to" at that same date by default,
+// so you don't have to click forward through the calendar to reach it.
+window.onAllotmentDateFromChange = function() {
+  const fromEl = document.getElementById('allotmentDateFrom');
+  const toEl = document.getElementById('allotmentDateTo');
+  if (fromEl.value) {
+    toEl.min = fromEl.value;
+    if (!toEl.value) toEl.value = fromEl.value;
+  } else {
+    toEl.removeAttribute('min');
+  }
+  renderAllotments();
+}
+
 window.renderAllotments = function() {
   const searchEl = document.getElementById('allotmentSearch');
   const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
@@ -1112,10 +1126,11 @@ window.addHotelBlock = function(h) {
       <div class="field"><label>Room Type (optional, for allotment tracking)</label><input class="hf-roomtype" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(h?h.roomType:'')}"></div>
     </div>
     <div class="row3">
-      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}"></div>
-      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"></div>
+      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}" oninput="onHotelCheckinChange(this)" onchange="onHotelCheckinChange(this)"></div>
+      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"${h&&h.checkin?` min="${h.checkin}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
       <div class="field"><label>Number of Rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
     </div>
+    <div class="hf-date-warning" style="display:none;font-size:12px;margin:-6px 0 6px;font-weight:600"></div>
     <div class="row2">
       <div class="field"><label>Status</label>
         <select class="hf-status">
@@ -1184,9 +1199,49 @@ window.addHotelBlock = function(h) {
       <div class="field" style="margin-top:10px"><label>Payment / Deposit Note</label><textarea class="hf-dep-note" placeholder="e.g. Special terms, payment plan, credit card brand required..." style="min-height:60px;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px">${h&&h.depositNote?h.depositNote:''}</textarea></div>
     </div>`;
   document.getElementById('hotel-blocks').appendChild(div);
+  validateHotelBlockDates(div.querySelector('.hf-checkin'));
 }
 window.toggleDep = function(cb, idx) { document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
 window.toggleCC = function(cb, idx) { document.getElementById('cc-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
+
+// When Check-in changes: point Check-out's date picker at that same date (default it in if empty,
+// and set min so it can't casually be flipped to before Check-in), then re-validate.
+window.onHotelCheckinChange = function(el) {
+  const block = el.closest('.hotel-block');
+  const checkoutEl = block.querySelector('.hf-checkout');
+  if (el.value) {
+    checkoutEl.min = el.value;
+    if (!checkoutEl.value) checkoutEl.value = el.value;
+  } else {
+    checkoutEl.removeAttribute('min');
+  }
+  validateHotelBlockDates(el);
+}
+
+// Live red warning if Check-out < Check-in; soft amber note if the stay is unusually long (>14 nights).
+window.validateHotelBlockDates = function(el) {
+  const block = el.closest('.hotel-block');
+  const warnEl = block.querySelector('.hf-date-warning');
+  if (!warnEl) return;
+  const checkin = block.querySelector('.hf-checkin').value;
+  const checkout = block.querySelector('.hf-checkout').value;
+  if (checkin && checkout && checkout < checkin) {
+    warnEl.textContent = '⚠️ Check-out date is before Check-in date';
+    warnEl.style.color = '#c0392b';
+    warnEl.style.display = '';
+    return;
+  }
+  if (checkin && checkout) {
+    const nights = daysBetween(checkin, checkout);
+    if (nights !== null && nights > 14) {
+      warnEl.textContent = `⚠️ Long stay: ${nights} nights — please confirm this is correct`;
+      warnEl.style.color = '#b8860b';
+      warnEl.style.display = '';
+      return;
+    }
+  }
+  warnEl.style.display = 'none';
+}
 
 window.saveBooking = async function() {
   const ref = document.getElementById('f-ref').value.trim();
@@ -1230,6 +1285,16 @@ window.saveBooking = async function() {
     });
   });
   if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
+
+  const badDates = hotels.find(h => h.checkin && h.checkout && h.checkout < h.checkin);
+  if (badDates) { alert(`Check-out date is before Check-in date for "${badDates.name}". Please fix the dates before saving.`); return; }
+
+  const longStay = hotels.find(h => h.checkin && h.checkout && (daysBetween(h.checkin, h.checkout) || 0) > 14);
+  if (longStay) {
+    const nights = daysBetween(longStay.checkin, longStay.checkout);
+    const ok = confirm(`"${longStay.name}" is booked for ${nights} nights (${longStay.checkin} → ${longStay.checkout}). Is that correct?`);
+    if (!ok) return;
+  }
 
   const existing = editId ? bookings.find(b=>b.id===editId) : null;
   const bookingType = document.getElementById('f-booking-type').value;
