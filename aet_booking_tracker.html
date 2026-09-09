@@ -214,6 +214,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
       </select>
       <input type="text" id="statsSearch" placeholder="Search hotel name..." oninput="renderStats()">
     </div>
+    <div id="statsDuplicatesWrap"></div>
     <div id="statsTableWrap"></div>
   </div>
 
@@ -357,9 +358,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal">
   <h2 id="allotmentModalTitle">New Allotment</h2>
   <div class="row2">
-    <div class="field"><label>Hotel Name</label><input id="allot-hotel" placeholder="e.g. Rawi Warin Resort"></div>
+    <div class="field"><label>Hotel Name</label><input id="allot-hotel" oninput="suggestAllotmentAliases()" placeholder="e.g. Rawi Warin Resort"></div>
     <div class="field"><label>Destination</label><input id="allot-destination" list="allotmentDestinations" placeholder="e.g. Koh Lanta"></div>
   </div>
+  <div class="field"><label>Also known as (other spellings used in bookings, comma-separated)</label><input id="allot-aliases" placeholder="e.g. Koh Chang Paradise Resort & Spa, Koh Chang Paradise"></div>
+  <div id="allotAliasSuggestions" style="font-size:12px;color:#7a4a00;margin:-8px 0 12px"></div>
   <div class="section-divider">Room Types</div>
   <div id="roomtype-blocks"></div>
   <button type="button" class="add-hotel-btn" onclick="addRoomTypeBlock()"><i class="ti ti-plus"></i> Add Room Type</button>
@@ -392,6 +395,7 @@ let hotelsCrm = [];
 let sops = [];
 let trips = [];
 let allotments = [];
+let dismissedDuplicates = [];
 
 let editId = null;
 let currentFilter = 'all';
@@ -463,6 +467,11 @@ function startApp() {
     if (currentCrmDetail && currentCrmDetail.type === 'partners') renderCrmDetail();
   });
 
+  onSnapshot(collection(db, 'dismissedDuplicates'), (snap) => {
+    dismissedDuplicates = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderStats();
+  });
+
   // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
 }
 
@@ -502,6 +511,15 @@ function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.cred
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 /* ---------- Allotments ---------- */
+// The set of hotel-name spellings this allotment should match: the hotel's own name plus any
+// aliases the team has added (e.g. "Koh Chang Paradise Resort & Spa" / "Koh Chang Paradise" for
+// the same hotel). Without this, a booking typed with a slightly different spelling wouldn't be
+// matched at all — undercounting "Booked" and making a genuinely full hotel look available.
+function allotmentNameSet(a) {
+  const names = [a.hotelName].concat(a.aliases||[]);
+  return new Set(names.map(n => (n||'').trim().toLowerCase()).filter(Boolean));
+}
+
 // Booked count = the PEAK number of rooms needed on any single night within the window being
 // checked — not a flat sum of every future booking. A hotel with 2 rooms allotted can easily
 // have 10 bookings across the year without ever being "Full", as long as no two of them overlap
@@ -510,8 +528,8 @@ function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'
 // Implemented as a sweep-line: each stay becomes a +rooms event at check-in and a -rooms event at
 // check-out (checkout day itself is not occupied — half-open interval), then we track the running
 // total room-by-room in date order and return its highest point.
-function allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd) {
-  const hn = (hotelName||'').trim().toLowerCase();
+function allotmentPeakInfo(a, roomTypeName, rangeStart, rangeEnd) {
+  const names = allotmentNameSet(a);
   const rt = (roomTypeName||'').trim().toLowerCase();
   const today = new Date(); today.setHours(0,0,0,0);
   const windowStart = rangeStart || today;
@@ -524,7 +542,7 @@ function allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd) {
     // a future, active reservation that occupies the allotment.
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
-      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if (!names.has((h.name||'').trim().toLowerCase())) return;
       if ((h.roomType||'').trim().toLowerCase() !== rt) return;
       if (!h.checkin || !h.checkout) return; // can't place it on the calendar — see allotmentDateIssuesCount
       const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
@@ -556,20 +574,20 @@ function allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd) {
 // on the same night. Summing them all would (and previously did) falsely show "Full" for a hotel
 // that's actually wide open on every date except the ones that truly overlap. See allotmentPeakInfo
 // for the sweep-line that computes this and the date it happens on.
-function allotmentBookedCount(hotelName, roomTypeName, rangeStart, rangeEnd) {
-  return allotmentPeakInfo(hotelName, roomTypeName, rangeStart, rangeEnd).peak;
+function allotmentBookedCount(a, roomTypeName, rangeStart, rangeEnd) {
+  return allotmentPeakInfo(a, roomTypeName, rangeStart, rangeEnd).peak;
 }
 
 // Bookings at this hotel that can't be placed on the calendar (missing check-in/check-out,
 // or a checkout that isn't after the check-in) — these are excluded from the count above rather
 // than risk showing a wrong number, so they're surfaced here instead as a data-quality warning.
-function allotmentDateIssuesCount(hotelName) {
-  const hn = (hotelName||'').trim().toLowerCase();
+function allotmentDateIssuesCount(a) {
+  const names = allotmentNameSet(a);
   let count = 0;
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
-      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if (!names.has((h.name||'').trim().toLowerCase())) return;
       if (!(h.roomType||'').trim()) return; // already covered by the "no Room Type" warning
       if (!h.checkin || !h.checkout) { count++; return; }
       const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
@@ -582,14 +600,14 @@ function allotmentDateIssuesCount(hotelName) {
 
 // Hotel entries that match an allotment's hotel name but have no Room Type set — these
 // can't be attributed to a specific room type, so they're excluded from the counts above.
-function allotmentUntaggedCount(hotelName, rangeStart, rangeEnd) {
-  const hn = (hotelName||'').trim().toLowerCase();
+function allotmentUntaggedCount(a, rangeStart, rangeEnd) {
+  const names = allotmentNameSet(a);
   const today = new Date(); today.setHours(0,0,0,0);
   let count = 0;
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
-      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if (!names.has((h.name||'').trim().toLowerCase())) return;
       if ((h.roomType||'').trim()) return;
       const ci = h.checkin ? new Date(h.checkin) : null;
       const co = h.checkout ? new Date(h.checkout) : null;
@@ -609,13 +627,13 @@ function allotmentUntaggedCount(hotelName, rangeStart, rangeEnd) {
 
 // The individual bookings that make up an allotment's "Booked" count — shown when a
 // hotel card is expanded, so the team can see exactly which bookings occupy the allotment.
-function allotmentBookingsList(hotelName, rangeStart, rangeEnd) {
-  const hn = (hotelName||'').trim().toLowerCase();
+function allotmentBookingsList(a, rangeStart, rangeEnd) {
+  const names = allotmentNameSet(a);
   const today = new Date(); today.setHours(0,0,0,0);
   const list = [];
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
-      if ((h.name||'').trim().toLowerCase() !== hn) return;
+      if (!names.has((h.name||'').trim().toLowerCase())) return;
       const ci = h.checkin ? new Date(h.checkin) : null;
       const co = h.checkout ? new Date(h.checkout) : null;
       if (ci) ci.setHours(0,0,0,0);
@@ -693,7 +711,7 @@ window.renderAllotments = function() {
 
   const buildCard = (a) => {
     const rows = (a.roomTypes||[]).map(rt => {
-      const { peak: booked, peakDate } = allotmentPeakInfo(a.hotelName, rt.name, rangeStart, rangeEnd);
+      const { peak: booked, peakDate } = allotmentPeakInfo(a, rt.name, rangeStart, rangeEnd);
       const available = Math.max(rt.qty - booked, 0);
       totalTypes++;
       let statusBadge;
@@ -714,11 +732,11 @@ window.renderAllotments = function() {
         <td>${statusBadge}</td>
       </tr>`;
     }).join('');
-    const untagged = allotmentUntaggedCount(a.hotelName, rangeStart, rangeEnd);
+    const untagged = allotmentUntaggedCount(a, rangeStart, rangeEnd);
     const untaggedNote = untagged > 0
       ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${untagged} booking${untagged>1?'s':''} at this hotel ${rangeStart?'in this period ':''}${untagged>1?'have':'has'} no Room Type set, so ${untagged>1?"they're":"it's"} not counted above — open the booking and set Room Type on that hotel line.</div>`
       : '';
-    const dateIssues = allotmentDateIssuesCount(a.hotelName);
+    const dateIssues = allotmentDateIssuesCount(a);
     const dateIssuesNote = dateIssues > 0
       ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${dateIssues} booking${dateIssues>1?'s':''} at this hotel ${dateIssues>1?'have':'has'} a missing or invalid check-in/check-out date, so ${dateIssues>1?"they're":"it's"} not counted above — open the booking and check the dates on that hotel line.</div>`
       : '';
@@ -726,7 +744,7 @@ window.renderAllotments = function() {
     const isExpanded = expandedAllotments.has(a.id);
     let bookingsListHtml = '';
     if (isExpanded) {
-      const list = allotmentBookingsList(a.hotelName, rangeStart, rangeEnd);
+      const list = allotmentBookingsList(a, rangeStart, rangeEnd);
       bookingsListHtml = list.length === 0
         ? `<div style="padding:12px 14px;font-size:12px;color:#888;border-top:0.5px solid #f0f0ec">No bookings found for this hotel${rangeStart?' in this period':''}.</div>`
         : `<div style="border-top:0.5px solid #f0f0ec;overflow-x:auto"><table class="hotels-table" style="min-width:600px">
@@ -747,6 +765,7 @@ window.renderAllotments = function() {
       <div class="card-header" onclick="toggleAllotmentExpand('${a.id}')">
         <div class="card-title">
           <span class="card-ref">${esc(a.hotelName)}</span>
+          ${a.aliases && a.aliases.length ? `<span style="font-size:11px;color:#aaa;font-weight:400">aka ${a.aliases.map(esc).join(', ')}</span>` : ''}
         </div>
         <div class="card-actions" onclick="event.stopPropagation()">
           <button class="icon-btn" title="Edit" onclick="openAllotmentModal('${a.id}')"><i class="ti ti-edit"></i></button>
@@ -766,7 +785,7 @@ window.renderAllotments = function() {
 
   // Total rooms currently booked for a hotel (summed across its room types) — used to sort
   // the busiest hotels to the top, so this stays useful even before every hotel has a Destination set.
-  const totalBookedFor = (a) => (a.roomTypes||[]).reduce((sum, rt) => sum + allotmentBookedCount(a.hotelName, rt.name, rangeStart, rangeEnd), 0);
+  const totalBookedFor = (a) => (a.roomTypes||[]).reduce((sum, rt) => sum + allotmentBookedCount(a, rt.name, rangeStart, rangeEnd), 0);
 
   // Group hotels by destination so the team can scan allotment by area (Koh Lanta, Bangkok, etc.).
   // Hotels with no Destination set yet fall into "Other" rather than blocking the view.
@@ -818,22 +837,49 @@ window.addRoomTypeBlock = function(rt) {
   document.getElementById('roomtype-blocks').appendChild(div);
 }
 
+// While typing a hotel name in the Allotment modal, suggest other spellings already seen in
+// bookings that look like the same hotel (same logic as the Response Stats duplicate warning),
+// so the team can add them as aliases right away instead of discovering the mismatch later.
+window.suggestAllotmentAliases = function() {
+  const box = document.getElementById('allotAliasSuggestions');
+  if (!box) return;
+  const hotelName = document.getElementById('allot-hotel').value.trim();
+  if (!hotelName) { box.innerHTML = ''; return; }
+  const existingAliases = document.getElementById('allot-aliases').value.split(',').map(s => s.trim()).filter(Boolean);
+  const allBookingNames = [...new Set(bookings.flatMap(b => (b.hotels||[]).map(h => (h.name||'').trim())).filter(Boolean))];
+  const groups = findPossibleDuplicateHotelNames([hotelName, ...allBookingNames]);
+  const group = groups.find(g => g.some(n => n.toLowerCase() === hotelName.toLowerCase()));
+  const suggestions = group ? group.filter(n => n.toLowerCase() !== hotelName.toLowerCase() && !existingAliases.some(a => a.toLowerCase() === n.toLowerCase())) : [];
+  box.innerHTML = suggestions.length === 0 ? '' : `⚠ Also seen in bookings, possibly the same hotel: ${suggestions.map(n => `<a href="#" onclick="addAllotmentAlias('${n.replace(/'/g,"\\'")}');return false" style="color:#7a4a00;text-decoration:underline">${esc(n)}</a>`).join(', ')}`;
+}
+
+window.addAllotmentAlias = function(name) {
+  const field = document.getElementById('allot-aliases');
+  const existing = field.value.split(',').map(s => s.trim()).filter(Boolean);
+  if (!existing.some(a => a.toLowerCase() === name.toLowerCase())) existing.push(name);
+  field.value = existing.join(', ');
+  window.suggestAllotmentAliases();
+}
+
 window.openAllotmentModal = function(id) {
   editingAllotmentId = id || null;
   const a = id ? allotments.find(x => x.id === id) : null;
   document.getElementById('allotmentModalTitle').textContent = a ? 'Edit allotment' : 'New allotment';
   document.getElementById('allot-hotel').value = a ? a.hotelName : '';
   document.getElementById('allot-destination').value = a ? (a.destination||'') : '';
+  document.getElementById('allot-aliases').value = a && a.aliases ? a.aliases.join(', ') : '';
   document.getElementById('roomtype-blocks').innerHTML = '';
   if (a && a.roomTypes && a.roomTypes.length > 0) a.roomTypes.forEach(rt => addRoomTypeBlock(rt));
   else addRoomTypeBlock();
   document.getElementById('allotmentModal').classList.add('open');
+  window.suggestAllotmentAliases();
 }
 
 window.saveAllotment = async function() {
   const hotelName = document.getElementById('allot-hotel').value.trim();
   if (!hotelName) { alert('Please enter a hotel name.'); return; }
   const destination = document.getElementById('allot-destination').value.trim();
+  const aliases = document.getElementById('allot-aliases').value.split(',').map(s => s.trim()).filter(Boolean);
   const roomTypes = [];
   document.querySelectorAll('#roomtype-blocks .rt-block').forEach(block => {
     const name = block.querySelector('.rt-name').value.trim();
@@ -842,7 +888,7 @@ window.saveAllotment = async function() {
   });
   if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity.'); return; }
   const id = editingAllotmentId || ('a_' + Date.now());
-  await setDoc(doc(db, 'allotments', id), { hotelName, destination, roomTypes });
+  await setDoc(doc(db, 'allotments', id), { hotelName, destination, aliases, roomTypes });
   window.closeModal('allotmentModal');
 }
 
@@ -1249,10 +1295,83 @@ window.toggleStatsExpand = function(idx) {
   renderStats();
 }
 
+// Strips punctuation/casing down to a bare word-set so name variants of the same hotel
+// ("Koh Chang Paradise Resort & Spa" / "Koh Chang Paradise Resort" / "Koh Chang Paradise")
+// can be compared. Used only for the duplicate-name detector below and for allotment alias
+// suggestions — never for silently merging counts, since that could just as easily merge two
+// genuinely different hotels that happen to share words.
+function normalizeHotelName(name) {
+  return (name||'').toLowerCase().replace(/[:&]/g, ' ').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Flags hotel names that are likely the same hotel typed differently: one name's normalized
+// form is fully contained in the other's (handles both "shorter version" and "extra prefix/suffix"
+// cases). Grouped with a small union-find so a chain of variants (short/medium/long form) all land
+// in one group. This only DETECTS candidates for a human to review — it never merges data itself.
+function findPossibleDuplicateHotelNames(names) {
+  const uniq = [...new Set(names.map(n => (n||'').trim()).filter(Boolean))];
+  const norm = uniq.map(n => normalizeHotelName(n));
+  const parent = uniq.map((_, i) => i);
+  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
+  const union = (i, j) => { const ri = find(i), rj = find(j); if (ri !== rj) parent[ri] = rj; };
+  for (let i = 0; i < uniq.length; i++) {
+    for (let j = i + 1; j < uniq.length; j++) {
+      if (norm[i] === norm[j]) { union(i, j); continue; } // same after normalizing (e.g. only punctuation differed)
+      if (norm[i].length < 5 || norm[j].length < 5) continue; // too short to compare safely
+      if (norm[i].includes(norm[j]) || norm[j].includes(norm[i])) union(i, j);
+    }
+  }
+  const groups = {};
+  uniq.forEach((n, i) => { const r = find(i); (groups[r] = groups[r] || []).push(n); });
+  return Object.values(groups).filter(g => g.length > 1);
+}
+
+// Deterministic id for a group of names, independent of order — used to remember a "these are
+// different hotels" decision (dismissDuplicateGroup) so the warning doesn't keep reappearing.
+function duplicateGroupKey(group) {
+  return group.map(n => n.trim().toLowerCase()).sort().join('|');
+}
+
+let lastDupGroups = []; // the groups currently shown in the Response Stats duplicate-name panel
+
+// "Same hotel — merge": rewrites every booking using any of the OTHER spellings in the group to
+// use one chosen spelling instead, so they collapse into a single row here and a single Allotment
+// match. The canonical spelling is whichever name is already used on the most bookings (ties
+// broken by picking the longer, usually more complete, name) — minimizing how many bookings change.
+window.mergeDuplicateHotelNames = async function(idx) {
+  const group = lastDupGroups[idx];
+  if (!group) return;
+  const counts = {};
+  bookings.forEach(b => (b.hotels||[]).forEach(h => {
+    const n = (h.name||'').trim();
+    if (group.some(g => g.toLowerCase() === n.toLowerCase())) counts[n] = (counts[n]||0) + 1;
+  }));
+  const canonical = group.slice().sort((a,b) => (counts[b]||0) - (counts[a]||0) || b.length - a.length)[0];
+  const others = group.filter(n => n !== canonical);
+  const affected = bookings.filter(b => (b.hotels||[]).some(h => others.some(o => (h.name||'').trim().toLowerCase() === o.toLowerCase())));
+  if (affected.length === 0) return;
+  const ok = confirm(`Rename ${others.map(o => '"'+o+'"').join(' and ')} to "${canonical}" across ${affected.length} booking${affected.length===1?'':'s'}?\n\nThis edits those bookings permanently.`);
+  if (!ok) return;
+  for (const b of affected) {
+    const hotels = (b.hotels||[]).map(h => others.some(o => (h.name||'').trim().toLowerCase() === o.toLowerCase()) ? { ...h, name: canonical } : h);
+    await setDoc(doc(db, 'bookings', b.id), { ...b, hotels });
+  }
+  showToast(`✅ Merged into "${canonical}" across ${affected.length} booking${affected.length===1?'':'s'}`);
+}
+
+// "Different hotels — not the same": remembers this specific set of names as reviewed-and-rejected
+// so it stops showing up as a possible duplicate, without changing any booking data.
+window.dismissDuplicateGroup = async function(idx) {
+  const group = lastDupGroups[idx];
+  if (!group) return;
+  const key = duplicateGroupKey(group);
+  await setDoc(doc(db, 'dismissedDuplicates', key), { key, names: group });
+}
+
 window.renderStats = function() {
   const q = (document.getElementById('statsSearch') ? document.getElementById('statsSearch').value : '').toLowerCase();
   const yearFilter = document.getElementById('statsYearFilter') ? document.getElementById('statsYearFilter').value : '';
-  
+
   const map = {}; // hotelName -> {count, nights}
   let totalNightsAll = 0;
   bookings.forEach(b => {
@@ -1285,6 +1404,28 @@ window.renderStats = function() {
   const wrap = document.getElementById('statsTableWrap');
   const yearLabel = yearFilter ? ` (${yearFilter})` : '';
   document.getElementById('totalNightsStat').textContent = totalNightsAll;
+
+  // Warn about hotel names that look like the same hotel typed differently — these silently
+  // split a hotel's bookings across several rows here, and worse, can make an Allotment
+  // undercount (a booking under a slightly different spelling won't be matched against it).
+  const dupWrap = document.getElementById('statsDuplicatesWrap');
+  if (dupWrap) {
+    const dismissedKeys = new Set(dismissedDuplicates.map(d => d.key));
+    const dupGroups = findPossibleDuplicateHotelNames(Object.keys(map)).filter(g => !dismissedKeys.has(duplicateGroupKey(g)));
+    lastDupGroups = dupGroups;
+    dupWrap.innerHTML = dupGroups.length === 0 ? '' : `<div style="background:#fef3e2;border:0.5px solid #f0d9a8;border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#7a4a00">
+      <strong>⚠ Possible duplicate hotel names — same hotel?</strong> These look like the same hotel spelled differently, which splits their bookings apart below (and can make Allotments miss bookings).
+      <ul style="margin:8px 0 0;padding-left:20px;list-style:none">
+        ${dupGroups.map((g,i) => `<li style="margin-bottom:10px">
+          <div>${g.map(n => `<strong>${esc(n)}</strong> (${map[n] ? map[n].count : 0})`).join(' &nbsp;/&nbsp; ')}</div>
+          <div style="margin-top:4px;display:flex;gap:6px">
+            <button class="btn" style="padding:3px 10px;font-size:11px;background:#1a7a55;color:#fff;border:none" onclick="mergeDuplicateHotelNames(${i})">Yes, same hotel — merge</button>
+            <button class="btn" style="padding:3px 10px;font-size:11px" onclick="dismissDuplicateGroup(${i})">No, different hotels</button>
+          </div>
+        </li>`).join('')}
+      </ul>
+    </div>`;
+  }
 
   if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out dates filled in.</div>'; return; }
 
