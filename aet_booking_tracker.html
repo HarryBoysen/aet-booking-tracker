@@ -1114,6 +1114,17 @@ window.addHotelBlock = function(h) {
   const idx = hotelCount;
   const hid = h ? h.id : 'h_' + Date.now() + '_' + idx;
   const today = new Date().toISOString().split('T')[0];
+  // New block with no data of its own (adding another hotel to a multi-stop booking): default its
+  // Check-in to the previous hotel block's Check-out, so consecutive stays don't need the date retyped.
+  let defaultCheckin = '';
+  if (!h) {
+    const existingBlocks = document.querySelectorAll('#hotel-blocks .hotel-block');
+    if (existingBlocks.length > 0) {
+      const lastCheckout = existingBlocks[existingBlocks.length - 1].querySelector('.hf-checkout').value;
+      if (lastCheckout) defaultCheckin = lastCheckout;
+    }
+  }
+  const checkinVal = h ? (h.checkin || '') : defaultCheckin;
   const div = document.createElement('div');
   div.className = 'hotel-block';
   div.dataset.hid = hid;
@@ -1126,8 +1137,8 @@ window.addHotelBlock = function(h) {
       <div class="field"><label>Room Type (optional, for allotment tracking)</label><input class="hf-roomtype" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(h?h.roomType:'')}"></div>
     </div>
     <div class="row3">
-      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${h?h.checkin:''}" oninput="onHotelCheckinChange(this)" onchange="onHotelCheckinChange(this)"></div>
-      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':''}"${h&&h.checkin?` min="${h.checkin}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
+      <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${checkinVal}" oninput="onHotelCheckinChange(this)" onchange="onHotelCheckinChange(this)"></div>
+      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':checkinVal}"${checkinVal?` min="${checkinVal}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
       <div class="field"><label>Number of Rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
     </div>
     <div class="hf-date-warning" style="display:none;font-size:12px;margin:-6px 0 6px;font-weight:600"></div>
