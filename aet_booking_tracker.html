@@ -272,8 +272,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="field"><label>Your Name (Agent)</label><input id="f-agent" placeholder="Name"></div>
     <div class="field"><label>Guest / Group Name</label><input id="f-guest" placeholder="Guest or group name"></div>
   </div>
-  <div class="field"><label>Partner (Optional)</label>
-    <select id="f-partner"><option value="">— None —</option></select>
+  <div class="row2">
+    <div class="field"><label>Partner (Optional)</label>
+      <select id="f-partner"><option value="">— None —</option></select>
+    </div>
+    <div class="field"><label>No. of Pax</label><input type="number" min="1" id="f-pax" placeholder="e.g. 4"></div>
   </div>
   <div class="field"><label>Booking Type</label>
     <select id="f-booking-type">
@@ -510,6 +513,17 @@ function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit
 function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+// A hotel stay (one hotel-block on a booking) can now book several room types at once
+// (e.g. 1 Standard + 1 Family for the same dates). Newer bookings store that as h.roomTypes:
+// [{roomType, rooms}, ...]; older bookings still have a single flat h.roomType/h.rooms on the
+// hotel entry itself. This is the one place that reads either shape, so every allotment/stats
+// function below works for both without needing to migrate old Firestore data.
+function hotelRoomTypeLines(h) {
+  if (h.roomTypes && h.roomTypes.length > 0) return h.roomTypes;
+  return [{ roomType: h.roomType || '', rooms: h.rooms || 1 }];
+}
+function hotelTotalRooms(h) { return hotelRoomTypeLines(h).reduce((sum, rt) => sum + (parseInt(rt.rooms) || 1), 0); }
+
 /* ---------- Allotments ---------- */
 // The set of hotel-name spellings this allotment should match: the hotel's own name plus any
 // aliases the team has added (e.g. "Koh Chang Paradise Resort & Spa" / "Koh Chang Paradise" for
@@ -543,7 +557,6 @@ function allotmentPeakInfo(a, roomTypeName, rangeStart, rangeEnd) {
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
       if (!names.has((h.name||'').trim().toLowerCase())) return;
-      if ((h.roomType||'').trim().toLowerCase() !== rt) return;
       if (!h.checkin || !h.checkout) return; // can't place it on the calendar — see allotmentDateIssuesCount
       const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
       const co = new Date(h.checkout); co.setHours(0,0,0,0);
@@ -551,9 +564,14 @@ function allotmentPeakInfo(a, roomTypeName, rangeStart, rangeEnd) {
       const start = ci < windowStart ? windowStart : ci;
       const end = (windowEnd && co > windowEnd) ? windowEnd : co;
       if (start >= end) return; // stay doesn't overlap the window being checked
-      const rooms = parseInt(h.rooms) || 1;
-      events.push({ date: start, delta: rooms });
-      events.push({ date: end, delta: -rooms });
+      // A stay can book several room types at once (e.g. 1 Standard + 1 Family) — only the
+      // line(s) matching this room type occupy this allotment; the rest belong to other room types.
+      hotelRoomTypeLines(h).forEach(line => {
+        if ((line.roomType||'').trim().toLowerCase() !== rt) return;
+        const rooms = parseInt(line.rooms) || 1;
+        events.push({ date: start, delta: rooms });
+        events.push({ date: end, delta: -rooms });
+      });
     });
   });
   // Sort by date; on a tie, process checkouts (-) before checkins (+) so a same-day
@@ -578,6 +596,61 @@ function allotmentBookedCount(a, roomTypeName, rangeStart, rangeEnd) {
   return allotmentPeakInfo(a, roomTypeName, rangeStart, rangeEnd).peak;
 }
 
+// A room type either has one flat quantity that applies year-round (rt.qty, the original
+// behaviour), or — when a hotel only grants allotment for specific date ranges, e.g. high season
+// 1/11-19/12 and 10/1-30/4 — a list of season periods (rt.periods), each with its own quantity.
+// Returns one display row per period (or a single row from the flat qty when no periods are set),
+// each evaluated as its own peak-occupancy window intersected with the currently selected
+// "Check period" filter, so a period that the filter doesn't overlap at all is left out.
+function allotmentRoomTypeRows(a, rt, rangeStart, rangeEnd) {
+  if (!rt.periods || rt.periods.length === 0) {
+    const { peak: booked, peakDate } = allotmentPeakInfo(a, rt.name, rangeStart, rangeEnd);
+    return [{ label: rt.name, qty: rt.qty, booked, peakDate }];
+  }
+  const sorted = rt.periods.slice().sort((p1, p2) => (p1.start||'').localeCompare(p2.start||''));
+  return sorted.map(p => {
+    const ps = new Date(p.start); ps.setHours(0,0,0,0);
+    const pe = new Date(p.end); pe.setHours(0,0,0,0);
+    let ws = ps, we = pe;
+    if (rangeStart && rangeStart > ws) ws = rangeStart;
+    if (rangeEnd && rangeEnd < we) we = rangeEnd;
+    if (ws >= we) return null; // this period doesn't overlap the currently selected Check period at all
+    const { peak: booked, peakDate } = allotmentPeakInfo(a, rt.name, ws, we);
+    return { label: `${rt.name} (${p.start} → ${p.end})`, qty: p.qty, booked, peakDate };
+  }).filter(Boolean);
+}
+
+// Room-type lines whose stay doesn't fall inside any of that room type's defined season periods
+// (only checked for room types that actually have periods set) — these aren't counted in any row
+// above, so they're surfaced here rather than silently vanishing from the numbers.
+function allotmentOutOfPeriodCount(a) {
+  const names = allotmentNameSet(a);
+  let count = 0;
+  bookings.forEach(b => {
+    (b.hotels||[]).forEach(h => {
+      if (h.status === 'cancelled') return;
+      if (!names.has((h.name||'').trim().toLowerCase())) return;
+      if (!h.checkin || !h.checkout) return; // already covered by the date-issues warning
+      const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
+      const co = new Date(h.checkout); co.setHours(0,0,0,0);
+      if (co <= ci) return; // already covered by the date-issues warning
+      hotelRoomTypeLines(h).forEach(line => {
+        const rtName = (line.roomType||'').trim();
+        if (!rtName) return; // untagged, already covered by the "no Room Type" warning
+        const rt = (a.roomTypes||[]).find(x => (x.name||'').trim().toLowerCase() === rtName.toLowerCase());
+        if (!rt || !rt.periods || rt.periods.length === 0) return; // this room type has no periods defined — nothing to check
+        const coversStay = rt.periods.some(p => {
+          const ps = new Date(p.start); ps.setHours(0,0,0,0);
+          const pe = new Date(p.end); pe.setHours(0,0,0,0);
+          return ci < pe && co > ps; // stay overlaps this period at all
+        });
+        if (!coversStay) count++;
+      });
+    });
+  });
+  return count;
+}
+
 // Bookings at this hotel that can't be placed on the calendar (missing check-in/check-out,
 // or a checkout that isn't after the check-in) — these are excluded from the count above rather
 // than risk showing a wrong number, so they're surfaced here instead as a data-quality warning.
@@ -588,7 +661,8 @@ function allotmentDateIssuesCount(a) {
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
       if (!names.has((h.name||'').trim().toLowerCase())) return;
-      if (!(h.roomType||'').trim()) return; // already covered by the "no Room Type" warning
+      const hasTaggedLine = hotelRoomTypeLines(h).some(rt => (rt.roomType||'').trim());
+      if (!hasTaggedLine) return; // already covered by the "no Room Type" warning
       if (!h.checkin || !h.checkout) { count++; return; }
       const ci = new Date(h.checkin); ci.setHours(0,0,0,0);
       const co = new Date(h.checkout); co.setHours(0,0,0,0);
@@ -608,7 +682,8 @@ function allotmentUntaggedCount(a, rangeStart, rangeEnd) {
     (b.hotels||[]).forEach(h => {
       if (h.status === 'cancelled') return;
       if (!names.has((h.name||'').trim().toLowerCase())) return;
-      if ((h.roomType||'').trim()) return;
+      const untaggedLines = hotelRoomTypeLines(h).filter(rt => !(rt.roomType||'').trim());
+      if (untaggedLines.length === 0) return;
       const ci = h.checkin ? new Date(h.checkin) : null;
       const co = h.checkout ? new Date(h.checkout) : null;
       if (ci) ci.setHours(0,0,0,0);
@@ -619,7 +694,7 @@ function allotmentUntaggedCount(a, rangeStart, rangeEnd) {
       } else {
         if (co && co < today) return;
       }
-      count++;
+      count += untaggedLines.length;
     });
   });
   return count;
@@ -644,10 +719,14 @@ function allotmentBookingsList(a, rangeStart, rangeEnd) {
       } else {
         if (h.status !== 'cancelled' && co && co < today) return;
       }
-      list.push({
-        ref: b.ref || '', guest: b.guest || '',
-        roomType: h.roomType || '', checkin: h.checkin || '', checkout: h.checkout || '',
-        rooms: h.rooms || 1, status: h.status || ''
+      // One row per room-type line, so a stay booking e.g. 1 Standard + 1 Family shows as two
+      // separate rows here, matching how each room type is tracked separately above.
+      hotelRoomTypeLines(h).forEach(line => {
+        list.push({
+          ref: b.ref || '', guest: b.guest || '',
+          roomType: line.roomType || '', checkin: h.checkin || '', checkout: h.checkout || '',
+          rooms: line.rooms || 1, status: h.status || ''
+        });
       });
     });
   });
@@ -750,24 +829,23 @@ window.renderAllotments = function() {
   let totalTypes = 0, fullCount = 0, lowCount = 0;
 
   const buildCard = (a) => {
-    const rows = (a.roomTypes||[]).map(rt => {
-      const { peak: booked, peakDate } = allotmentPeakInfo(a, rt.name, rangeStart, rangeEnd);
-      const available = Math.max(rt.qty - booked, 0);
+    const rows = (a.roomTypes||[]).flatMap(rt => allotmentRoomTypeRows(a, rt, rangeStart, rangeEnd)).map(r => {
+      const available = Math.max(r.qty - r.booked, 0);
       totalTypes++;
       let statusBadge;
-      if (booked >= rt.qty) {
+      if (r.booked >= r.qty) {
         // Show the date the peak actually occurs on — "Full" over an open-ended future window
         // can otherwise be misread as "sold out from now on", when it may just be one busy night.
-        const dateStr = peakDate ? peakDate.toISOString().split('T')[0] : '';
+        const dateStr = r.peakDate ? r.peakDate.toISOString().split('T')[0] : '';
         statusBadge = `<span class="badge b-alert">Full${dateStr ? ' (from '+dateStr+')' : ''}</span>`;
         fullCount++;
       }
-      else if (booked > 0 && available <= 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
+      else if (r.booked > 0 && available <= 1) { statusBadge = `<span class="badge b-pending">Low</span>`; lowCount++; }
       else { statusBadge = `<span class="badge b-confirmed">Available</span>`; }
       return `<tr>
-        <td><strong>${esc(rt.name)}</strong></td>
-        <td>${rt.qty}</td>
-        <td>${booked}/${rt.qty}</td>
+        <td><strong>${esc(r.label)}</strong></td>
+        <td>${r.qty}</td>
+        <td>${r.booked}/${r.qty}</td>
         <td>${available}</td>
         <td>${statusBadge}</td>
       </tr>`;
@@ -779,6 +857,10 @@ window.renderAllotments = function() {
     const dateIssues = allotmentDateIssuesCount(a);
     const dateIssuesNote = dateIssues > 0
       ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${dateIssues} booking${dateIssues>1?'s':''} at this hotel ${dateIssues>1?'have':'has'} a missing or invalid check-in/check-out date, so ${dateIssues>1?"they're":"it's"} not counted above — open the booking and check the dates on that hotel line.</div>`
+      : '';
+    const outOfPeriod = allotmentOutOfPeriodCount(a);
+    const outOfPeriodNote = outOfPeriod > 0
+      ? `<div style="padding:8px 14px;font-size:12px;color:#7a4a00;background:#fef3e2;border-top:0.5px solid #f0f0ec">⚠ ${outOfPeriod} room-type line${outOfPeriod>1?'s':''} at this hotel ${outOfPeriod>1?'fall':'falls'} outside any defined season period for that room type, so ${outOfPeriod>1?"they're":"it's"} not counted above — check the dates, or add a season period that covers them.</div>`
       : '';
     const missingAliases = allotmentMissingAliasSuggestions(a);
     const missingAliasNote = missingAliases.length > 0
@@ -823,6 +905,7 @@ window.renderAllotments = function() {
       </table></div>
       ${untaggedNote}
       ${dateIssuesNote}
+      ${outOfPeriodNote}
       ${missingAliasNote}
       ${bookingsListHtml}
     </div>`;
@@ -871,15 +954,37 @@ window.renderAllotments = function() {
 
 window.addRoomTypeBlock = function(rt) {
   const div = document.createElement('div');
-  div.className = 'row2 rt-block';
-  div.style.marginBottom = '8px';
+  div.className = 'rt-block';
+  div.style.cssText = 'border:0.5px solid #e5e5e0;border-radius:10px;padding:10px;margin-bottom:10px';
   div.innerHTML = `
-    <div class="field" style="margin-bottom:0"><input class="rt-name" placeholder="e.g. Deluxe" list="roomTypeSuggestions" value="${esc(rt?rt.name:'')}"></div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <input type="number" min="1" class="rt-qty" placeholder="Qty" value="${rt&&rt.qty?rt.qty:''}" style="flex:1">
-      <button type="button" onclick="this.closest('.rt-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
-    </div>`;
+    <div class="row2" style="margin-bottom:0">
+      <div class="field" style="margin-bottom:0"><input class="rt-name" placeholder="e.g. Deluxe" list="roomTypeSuggestions" value="${esc(rt?rt.name:'')}"></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" min="1" class="rt-qty" placeholder="Qty (used when no season periods below)" value="${rt&&rt.qty?rt.qty:''}" style="flex:1">
+        <button type="button" onclick="this.closest('.rt-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
+      </div>
+    </div>
+    <div class="rt-periods" style="margin-top:8px"></div>
+    <button type="button" class="btn" style="padding:3px 9px;font-size:11px;margin-top:2px" onclick="addRoomTypePeriodLine(this.previousElementSibling)">+ Add season period (different allotment for specific dates)</button>`;
   document.getElementById('roomtype-blocks').appendChild(div);
+  (rt && rt.periods || []).forEach(p => addRoomTypePeriodLine(div.querySelector('.rt-periods'), p));
+}
+
+// A season period is a concrete date range this room type gets its own allotment quantity for
+// (e.g. high season 1/11-19/12). Dates are entered as specific date ranges rather than a
+// recurring yearly rule, so they can just be re-added for the following year when it comes.
+window.addRoomTypePeriodLine = function(container, p) {
+  const row = document.createElement('div');
+  row.className = 'rt-period-line row3';
+  row.style.cssText = 'margin-bottom:6px;align-items:flex-end';
+  row.innerHTML = `
+    <div class="field" style="margin-bottom:0"><label style="font-size:11px">From</label><input type="date" class="rt-period-start" value="${p?p.start||'':''}"></div>
+    <div class="field" style="margin-bottom:0"><label style="font-size:11px">To</label><input type="date" class="rt-period-end" value="${p?p.end||'':''}"></div>
+    <div style="display:flex;gap:6px;align-items:center">
+      <input type="number" min="1" class="rt-period-qty" placeholder="Qty" value="${p&&p.qty?p.qty:''}" style="flex:1">
+      <button type="button" onclick="this.closest('.rt-period-line').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:16px"><i class="ti ti-x"></i></button>
+    </div>`;
+  container.appendChild(row);
 }
 
 // While typing a hotel name in the Allotment modal, suggest other spellings already seen in
@@ -926,12 +1031,26 @@ window.saveAllotment = async function() {
   const destination = document.getElementById('allot-destination').value.trim();
   const aliases = document.getElementById('allot-aliases').value.split(',').map(s => s.trim()).filter(Boolean);
   const roomTypes = [];
+  let periodDateError = '';
   document.querySelectorAll('#roomtype-blocks .rt-block').forEach(block => {
     const name = block.querySelector('.rt-name').value.trim();
     const qty = parseInt(block.querySelector('.rt-qty').value) || 0;
-    if (name && qty > 0) roomTypes.push({ name, qty });
+    const periods = [];
+    block.querySelectorAll('.rt-periods .rt-period-line').forEach(line => {
+      const start = line.querySelector('.rt-period-start').value;
+      const end = line.querySelector('.rt-period-end').value;
+      const pqty = parseInt(line.querySelector('.rt-period-qty').value) || 0;
+      if (!start && !end && !pqty) return; // fully empty period row — ignore
+      if (!periodDateError && (!start || !end || end <= start)) periodDateError = `A season period for "${name||'a room type'}" needs a valid From/To date range (To must be after From).`;
+      if (!periodDateError && !pqty) periodDateError = `A season period for "${name||'a room type'}" needs a quantity.`;
+      periods.push({ start, end, qty: pqty });
+    });
+    if (!name) return;
+    if (periods.length === 0 && qty <= 0) return; // nothing usable on this room type line
+    roomTypes.push({ name, qty, periods });
   });
-  if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity.'); return; }
+  if (periodDateError) { alert(periodDateError); return; }
+  if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity (or season periods).'); return; }
   const id = editingAllotmentId || ('a_' + Date.now());
   await setDoc(doc(db, 'allotments', id), { hotelName, destination, aliases, roomTypes });
   window.closeModal('allotmentModal');
@@ -1037,11 +1156,12 @@ window.render = function render() {
       } else depHtml = `<span class="dep-none">—</span>`;
       const viaHtml = h.agentBooked ? `<span class="badge via-agent">Agent</span>` : `<span class="via-direct">Direct</span>`;
 
-      const roomTypeSub = h.roomType ? `<div style="font-size:11px;color:#aaa;margin-top:2px">${esc(h.roomType)}</div>` : '';
+      const rtLines = hotelRoomTypeLines(h).filter(rt => (rt.roomType||'').trim());
+      const roomTypeSub = rtLines.length ? `<div style="font-size:11px;color:#aaa;margin-top:2px">${rtLines.map(rt => `${esc(rt.roomType)} x${rt.rooms||1}`).join(', ')}</div>` : '';
       return `<tr class="${alert ? 'hotel-alert' : ''}">
         <td><strong>${esc(h.name)}</strong>${roomTypeSub}</td>
         <td>${h.checkin || '—'}</td>
-        <td>${h.rooms || 1}</td>
+        <td>${hotelTotalRooms(h)}</td>
         <td>${statusBadge}</td>
         <td>${viaHtml}</td>
         <td>${h.sent || '—'}</td>
@@ -1060,6 +1180,7 @@ window.render = function render() {
         <div class="card-title">
           <span class="card-ref">${esc(b.ref)}</span>
           <span class="card-guest">${esc(b.guest)}</span>
+          ${b.pax ? `<span style="font-size:12px;color:#888">${b.pax} pax</span>` : ''}
           <span class="card-agent">${esc(b.agent)}</span>
           ${b.booking_type === 'pre-booking' ? '<span style="font-size:11px;background:#fef3e2;color:#7a4a00;padding:2px 8px;border-radius:20px">Pre-Booking</span>' : ''}
           ${preBookingAlert ? '<span style="font-size:11px;background:#fce8e8;color:#a32d2d;padding:2px 8px;border-radius:20px;margin-left:4px">⚠ 45 days</span>' : ''}
@@ -1099,6 +1220,7 @@ window.openModal = function(b) {
   document.getElementById('f-ref').value = b ? b.ref : '';
   document.getElementById('f-agent').value = b ? b.agent : currentUser;
   document.getElementById('f-guest').value = b ? b.guest : '';
+  document.getElementById('f-pax').value = b && b.pax ? b.pax : '';
   refreshPartnerDropdown();
   document.getElementById('f-partner').value = b ? (b.partnerId || '') : '';
   document.getElementById('hotel-blocks').innerHTML = '';
@@ -1132,16 +1254,15 @@ window.addHotelBlock = function(h) {
     <div class="hotel-block-title">Hotel ${idx}
       <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
     </div>
+    <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" list="allotmentHotelNames" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
     <div class="row2">
-      <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" list="allotmentHotelNames" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
-      <div class="field"><label>Room Type (optional, for allotment tracking)</label><input class="hf-roomtype" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(h?h.roomType:'')}"></div>
-    </div>
-    <div class="row3">
       <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${checkinVal}" oninput="onHotelCheckinChange(this)" onchange="onHotelCheckinChange(this)"></div>
       <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':checkinVal}"${checkinVal?` min="${checkinVal}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
-      <div class="field"><label>Number of Rooms</label><input type="number" min="1" class="hf-rooms" placeholder="e.g. 3" value="${h&&h.rooms?h.rooms:'1'}"></div>
     </div>
     <div class="hf-date-warning" style="display:none;font-size:12px;margin:-6px 0 6px;font-weight:600"></div>
+    <div class="field" style="margin-bottom:6px"><label>Room Types (optional, for allotment tracking — add one line per room type)</label></div>
+    <div class="hf-roomtypes"></div>
+    <button type="button" class="btn" style="padding:4px 10px;font-size:12px;margin:-2px 0 14px" onclick="addHotelRoomTypeLine(this.previousElementSibling)"><i class="ti ti-plus"></i> Add Room Type</button>
     <div class="row2">
       <div class="field"><label>Status</label>
         <select class="hf-status">
@@ -1210,7 +1331,25 @@ window.addHotelBlock = function(h) {
       <div class="field" style="margin-top:10px"><label>Payment / Deposit Note</label><textarea class="hf-dep-note" placeholder="e.g. Special terms, payment plan, credit card brand required..." style="min-height:60px;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px">${h&&h.depositNote?h.depositNote:''}</textarea></div>
     </div>`;
   document.getElementById('hotel-blocks').appendChild(div);
+  // A stay can book several room types at once — pre-fill one line per room type this hotel
+  // already has (works for both the old single-roomType format and the new roomTypes array,
+  // via hotelRoomTypeLines), or a single blank line for a brand-new hotel block.
+  const rtContainer = div.querySelector('.hf-roomtypes');
+  const initialLines = h ? hotelRoomTypeLines(h) : [{ roomType: '', rooms: 1 }];
+  initialLines.forEach(rt => addHotelRoomTypeLine(rtContainer, rt));
   validateHotelBlockDates(div.querySelector('.hf-checkin'));
+}
+window.addHotelRoomTypeLine = function(container, rt) {
+  const line = document.createElement('div');
+  line.className = 'hf-rt-line row2';
+  line.style.cssText = 'margin-bottom:8px;align-items:flex-end';
+  line.innerHTML = `
+    <div class="field" style="margin-bottom:0"><input class="hf-rt-name" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(rt?rt.roomType:'')}"></div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="number" min="1" class="hf-rt-rooms" placeholder="Rooms" value="${rt&&rt.rooms?rt.rooms:'1'}" style="flex:1">
+      <button type="button" onclick="this.closest('.hf-rt-line').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
+    </div>`;
+  container.appendChild(line);
 }
 window.toggleDep = function(cb, idx) { document.getElementById('dep-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
 window.toggleCC = function(cb, idx) { document.getElementById('cc-fields-' + idx).style.display = cb.checked ? '' : 'none'; }
@@ -1258,9 +1397,11 @@ window.saveBooking = async function() {
   const ref = document.getElementById('f-ref').value.trim();
   const agent = document.getElementById('f-agent').value.trim();
   const guest = document.getElementById('f-guest').value.trim();
+  const pax = parseInt(document.getElementById('f-pax').value) || 0;
   const partnerId = document.getElementById('f-partner').value;
   const partnerName = partnerId ? (partners.find(p=>p.id===partnerId)||{}).name || '' : '';
   if (!ref || !agent) { alert('Please fill in Booking ref. and Your name.'); return; }
+  if (!pax) { alert('Please fill in No. of Pax.'); return; }
 
   const hotels = [];
   document.querySelectorAll('.hotel-block').forEach(block => {
@@ -1268,12 +1409,18 @@ window.saveBooking = async function() {
     if (!name) return;
     const depReq = block.querySelector('.hf-dep-req').checked;
     const ccReq = block.querySelector('.hf-cc-req').checked;
+    const roomTypes = [];
+    block.querySelectorAll('.hf-roomtypes .hf-rt-line').forEach(line => {
+      const roomType = line.querySelector('.hf-rt-name').value.trim();
+      const rooms = parseInt(line.querySelector('.hf-rt-rooms').value) || 1;
+      roomTypes.push({ roomType, rooms });
+    });
+    if (roomTypes.length === 0) roomTypes.push({ roomType: '', rooms: 1 }); // every line was removed — keep at least one so "rooms" still saves
     hotels.push({
       id: block.dataset.hid, name,
-      roomType: block.querySelector('.hf-roomtype').value.trim(),
+      roomTypes,
       checkin: block.querySelector('.hf-checkin').value,
       checkout: block.querySelector('.hf-checkout').value,
-      rooms: parseInt(block.querySelector('.hf-rooms').value) || 1,
       status: block.querySelector('.hf-status').value,
       sent: block.querySelector('.hf-sent').value,
       reply: block.querySelector('.hf-reply').value,
@@ -1309,7 +1456,7 @@ window.saveBooking = async function() {
 
   const existing = editId ? bookings.find(b=>b.id===editId) : null;
   const bookingType = document.getElementById('f-booking-type').value;
-  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, hotels, partnerId, partnerName, booking_type: bookingType, archived: existing ? !!existing.archived : false };
+  const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, pax, hotels, partnerId, partnerName, booking_type: bookingType, archived: existing ? !!existing.archived : false };
   await setDoc(doc(db, 'bookings', booking.id), booking);
   window.closeModal('modal');
 }
@@ -1350,10 +1497,11 @@ window.copyFollowup = function(bookingId, hotelId, e) {
 }
 
 window.exportCSV = function() {
-  const rows = [['Ref','Agent','Partner','Guest','Hotel','Room Type','Booked via Travel Agent','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Agent informed','Accounting confirmed','Archived']];
+  const rows = [['Ref','Agent','Partner','Guest','Pax','Hotel','Room Type','Booked via Travel Agent','Check-in','Status','Email sent','Reply','Days','Deposit required','Currency','Amount','Agent informed','Accounting confirmed','Archived']];
   bookings.forEach(b => {
     (b.hotels||[]).forEach(h => {
-      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, h.name, h.roomType||'', h.agentBooked?'Yes':'No', h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
+      const roomTypeLabel = hotelRoomTypeLines(h).map(rt => `${rt.roomType||'—'} x${rt.rooms||1}`).join('; ');
+      rows.push([b.ref, b.agent, b.partnerName||'', b.guest, b.pax||'', h.name, roomTypeLabel, h.agentBooked?'Yes':'No', h.checkin, h.status, h.sent, h.reply, daysSince(h.sent)||'',
         h.deposit.required?'Yes':'No', h.deposit.currency||'THB', h.deposit.amount||'', h.deposit.informed?'Yes':'No', h.deposit.paid?'Yes':'No', b.archived?'Yes':'No']);
     });
   });
@@ -1386,7 +1534,7 @@ function statsBookingsList(hotelName, yearFilter) {
         if (checkinYear !== yearFilter) return;
       }
       const nights = daysBetween(h.checkin, h.checkout);
-      const rooms = h.rooms || 1;
+      const rooms = hotelTotalRooms(h);
       const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
       list.push({ ref: b.ref||'', guest: b.guest||'', checkin: h.checkin||'', checkout: h.checkout||'', rooms, nights: validNights, status: h.status||'' });
     });
@@ -1486,7 +1634,7 @@ window.renderStats = function() {
       if (h.status === 'cancelled') return; // cancelled stays never happened — don't count their nights
       const key = (h.name||'Unknown').trim();
       const nights = daysBetween(h.checkin, h.checkout);
-      const rooms = h.rooms || 1;
+      const rooms = hotelTotalRooms(h);
       const validNights = (nights !== null && nights > 0) ? nights * rooms : 0;
 
       // Filter by year if selected
@@ -1497,17 +1645,24 @@ window.renderStats = function() {
 
       if (validNights > 0) totalNightsAll += validNights;
 
-      if (!map[key]) map[key] = { count: 0, nights: 0 };
+      if (!map[key]) map[key] = { count: 0, nights: 0, pax: 0 };
       map[key].nights += validNights;
       map[key].count++;
+      map[key].pax += parseInt(b.pax) || 0;
     });
   });
   let rows = Object.keys(map).map(name => ({
-    name, nights: map[name].nights, count: map[name].count
+    name, nights: map[name].nights, count: map[name].count, pax: map[name].pax
   }));
   if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
   rows.sort((a,b) => (b.nights||0) - (a.nights||0));
   lastStatsRows = rows;
+
+  // Totals across whatever's currently shown (respects the search box above), so the bottom
+  // row always matches what's actually in the table rather than the whole unfiltered dataset.
+  const totalCount = rows.reduce((s,r) => s + r.count, 0);
+  const totalPax = rows.reduce((s,r) => s + r.pax, 0);
+  const totalNightsShown = rows.reduce((s,r) => s + r.nights, 0);
 
   const wrap = document.getElementById('statsTableWrap');
   const yearLabel = yearFilter ? ` (${yearFilter})` : '';
@@ -1538,18 +1693,19 @@ window.renderStats = function() {
   if (rows.length === 0) { wrap.innerHTML = '<div class="empty">No data yet — stats appear once hotels have check-in/out dates filled in.</div>'; return; }
 
   wrap.innerHTML = `<div class="table-wrap" style="background:#fff;border-radius:12px;border:0.5px solid #e0e0dc;overflow-x:auto">
-    <table class="hotels-table" style="min-width:500px">
-      <thead><tr><th>Hotel / Supplier</th><th>Bookings counted</th><th>Room nights${yearLabel}</th></tr></thead>
+    <table class="hotels-table" style="min-width:560px">
+      <thead><tr><th>Hotel / Supplier</th><th>Bookings counted</th><th>Pax</th><th>Room nights${yearLabel}</th></tr></thead>
       <tbody>${rows.map((r,i) => {
         const isExpanded = expandedStatsHotels.has(r.name);
         const mainRow = `<tr style="cursor:pointer" onclick="toggleStatsExpand(${i})">
           <td><i class="ti ti-chevron-down chevron ${isExpanded?'open':''}" style="margin-right:6px;font-size:14px"></i><strong>${esc(r.name)}</strong></td>
           <td>${r.count}</td>
+          <td>${r.pax}</td>
           <td><strong>${r.nights}</strong></td>
         </tr>`;
         if (!isExpanded) return mainRow;
         const list = statsBookingsList(r.name, yearFilter);
-        const detailRow = `<tr><td colspan="3" style="padding:0;background:#fafaf8">
+        const detailRow = `<tr><td colspan="4" style="padding:0;background:#fafaf8">
           <table class="hotels-table" style="width:100%">
             <thead><tr><th>Ref</th><th>Guest</th><th>Check-in</th><th>Check-out</th><th>Rooms</th><th>Nights</th><th>Status</th></tr></thead>
             <tbody>${list.length ? list.map(x => `<tr${x.status==='cancelled'?' style="opacity:0.5;text-decoration:line-through"':''}>
@@ -1565,6 +1721,12 @@ window.renderStats = function() {
         </td></tr>`;
         return mainRow + detailRow;
       }).join('')}</tbody>
+      <tfoot><tr style="font-weight:600;border-top:1.5px solid #ddd;background:#fafaf8">
+        <td>Total${rows.length < Object.keys(map).length ? ' (filtered)' : ''}</td>
+        <td>${totalCount}</td>
+        <td>${totalPax}</td>
+        <td>${totalNightsShown}</td>
+      </tr></tfoot>
     </table>
   </div>`;
 }
