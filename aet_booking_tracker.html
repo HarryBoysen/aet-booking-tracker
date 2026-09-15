@@ -1661,8 +1661,26 @@ window.renderStats = function() {
   // Totals across whatever's currently shown (respects the search box above), so the bottom
   // row always matches what's actually in the table rather than the whole unfiltered dataset.
   const totalCount = rows.reduce((s,r) => s + r.count, 0);
-  const totalPax = rows.reduce((s,r) => s + r.pax, 0);
   const totalNightsShown = rows.reduce((s,r) => s + r.nights, 0);
+  // Pax is booking-level, not hotel-level — a booking with 3 hotels appears in 3 rows above (each
+  // showing its pax, correctly, for that hotel), but must only be counted ONCE in this total, or a
+  // multi-hotel trip would inflate the total pax by however many hotels it has. So this is computed
+  // by unique booking id instead of by summing the per-row Pax column.
+  const rowNames = new Set(rows.map(r => r.name));
+  const paxCountedBookingIds = new Set();
+  let totalPax = 0;
+  bookings.forEach(b => {
+    const touchesShownRow = (b.hotels||[]).some(h => {
+      if (h.status === 'cancelled') return false;
+      if (!rowNames.has((h.name||'Unknown').trim())) return false;
+      if (yearFilter && h.checkin && h.checkin.split('-')[0] !== yearFilter) return false; // mirrors the year-filter check above
+      return true;
+    });
+    if (touchesShownRow && !paxCountedBookingIds.has(b.id)) {
+      paxCountedBookingIds.add(b.id);
+      totalPax += parseInt(b.pax) || 0;
+    }
+  });
 
   const wrap = document.getElementById('statsTableWrap');
   const yearLabel = yearFilter ? ` (${yearFilter})` : '';
