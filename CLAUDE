@@ -1,0 +1,36 @@
+# Booking Tracker — Working Rules
+
+Short, practical rules for working on this project with Claude / Claude Code / Cowork.
+No PR pipeline, no multi-role framework — just enough structure to avoid repeating mistakes.
+
+## Before starting any task
+- Read `STATUS.md` (and this file) first. Don't guess where the project stands.
+- Confirm the ONE specific task to do now. Don't "continue where we left off" — state it explicitly.
+
+## While working
+- Make the smallest change that solves the task. No unrelated refactoring "while I'm in there."
+- If a rule or convention already exists (see "Known rules" below), follow it — don't re-derive it.
+- If you hit the same bug a second or third time without fixing it, STOP. Say so plainly, explain the likely root cause, and don't just try another small patch blind.
+
+## After a change
+- Summarize: what changed, what was deliberately NOT touched, what should be manually tested (there is no automated test suite — Harry tests by hand).
+- Update `STATUS.md`: what works now, what's still broken/open.
+- Record any new decision or rule directly in this file, immediately — not just in chat.
+
+## Known rules (keep this list updated)
+- `seedDefaultsIfEmpty()` must always stay disabled.
+- Google Sign-In on GitHub Pages is unreliable (popup and redirect both fail) — security on this app is currently UNRESOLVED. The team uses the unsecured version. Do not consider this "done."
+- All form labels must be in English.
+- Correct partner names: Albatros Travel, Asien Travel, DANexplore, Unique Travel.
+
+## Model choice
+- Default to the standard model (Sonnet) for normal fixes and features.
+- Only escalate to a heavier model for genuinely hard structural decisions (e.g. finally solving the login/auth problem properly).
+
+## STATUS.md template
+```
+Status: <one line — e.g. "Live, in daily use by 10-person team">
+Known issues: <list, most important first — e.g. "Auth unresolved, running unsecured">
+Last change: <date + one line>
+Open questions: <anything waiting on Harry's decision>
+```
