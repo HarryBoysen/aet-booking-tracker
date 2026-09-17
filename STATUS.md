@@ -1,4 +1,4 @@
-[STATUS.md](https://github.com/user-attachments/files/32335709/STATUS.md)
+[STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
 Sidst opdateret: 2026-09-17
@@ -21,16 +21,8 @@ Sidst opdateret: 2026-09-17
 ## Åbent spørgsmål (afventer svar)
 - Sold-Out Calendar-artifact (separat værktøj, ikke denne tracker): forslag om at tilføje en note under "Allotment Availability" om at et hotels STOP SALE report betyder tabt allotment, selvom en tip stadig viser grøn. Ikke lagt ind endnu – afventer "ja/nej".
 
-## Arbejdsregler (fra Harry, gælder fremover)
-- Læs denne fil + seneste ændringer før noget nyt bygges
-- Én opgave ad gangen, sig konkret hvad der laves nu
-- Beslutninger skrives ind her med det samme de tages
-- Mindst mulig ændring pr. opgave
-- Efter en ændring: kort opsummering af hvad der blev lavet / ikke rørt / hvad der bør testes manuelt
-- Opdatér denne fil efter hver rigtig ændring
-- Sikkerhedsspørgsmål markeres åbne, glemmes ikke
-- Samme fejl rettet 2-3 gange uden held → stop, sig det højt, find rodårsag
-- Standard-model (Sonnet) til det meste; tungere model kun til svære strukturelle beslutninger (fx login-løsning en gang for alle)
+## Arbejdsregler
+Se CLAUDE.md i repoets rod.
 
 ## Teknisk note (til mig selv / næste session)
 - Repo: harryboysen/aet-booking-tracker, fil aet_booking_tracker.html, deployes via GitHub Pages
