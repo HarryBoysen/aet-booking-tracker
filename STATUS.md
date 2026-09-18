@@ -1,4 +1,4 @@
-[STATUS.md](https://github.com/user-attachments/files/32384719/STATUS.md)
+[STATUS.md](https://github.com/user-attachments/files/32387946/STATUS.md)
 [STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
@@ -86,6 +86,14 @@ Harrys opfølgende spørgsmål (2026-09-18): kan han som admin rette/slette hvis
 - **Værelsestype (Allotments-fanen, pr. hotel)**: samme princip — feltet er låst for ikke-admin på en allerede-gemt værelsestype (nye, aldrig gemte linjer kan alle stadig tilføje/fjerne frit). Admin kan omdøbe, med samme "X bookinger bliver opdateret"-advarsel, og omdøbningen retter navnet på matchende værelsestype-linjer i alle bookinger for netop det hotel (både det nye `roomTypes[]`-format og det gamle flade format).
 - **Sletning**: at slette et hotel-CRM-kort eller fjerne en værelsestype-linje er nu også admin-only, med en klar advarsel hvis navnet stadig er i brug (viser antal bookinger/allotments) — men blokerer ikke, admin kan bevidst fortsætte (fx hvis kortet reelt er overflødigt). At tilføje et NYT hotel eller en NY værelsestype er stadig åbent for alle, uændret.
 - Testet (Playwright, ny `test_hotel_roomtype_merge.js`, 4 scenarier + fuld regressionssuite kørt igen — ingen regressioner): ikke-admin kan ikke omdøbe (felt låst); admin-omdøbning fletter en stave-duplikat-hotel til ét CRM-kort med kombinerede noter og retter bookingens hotelnavn + historik; admin-omdøbning af en værelsestype retter alle matchende bookinger for det hotel; ikke-admin kan ikke fjerne en allerede-gemt værelsestype-linje.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## "Add all hotels from bookings"-knap i Hotels-fanen – bygget og testet, AFVENTER Harrys godkendelse
+Harry opdagede at Hotels-listen under "Partners & Hotels" var tom (forventet — den er en separat kontaktkort-liste, adskilt fra Allotments) og bad om at få alle hoteller de allerede har booket, listet der, så han kan rette/redigere dem.
+
+- Ny knap "Add all hotels from bookings" øverst til højre, kun synlig når "Hotels"-filteret er valgt. Bruger samme kilde som booking-formularens hotel-dropdown (`knownHotelNames()` — Allotments + eksisterende bookinger), og opretter et nyt CRM Hotels-kort for hvert navn der endnu ikke har et. Viser antal + en kort liste af navne til bekræftelse, før noget oprettes.
+- Overskriver eller sletter aldrig noget eksisterende — kan trygt køres flere gange (opretter ikke dubletter, tjekker uafhængigt af store/små bogstaver). Åben for alle (ikke admin-only), da den kun tilføjer, aldrig retter/sletter.
+- Testet (Playwright, ny `test_sync_hotels.js` + fuld regressionssuite — ingen regressioner): knap kun synlig på Hotels-visningen; alle manglende hotelnavne fra bookinger/allotments bliver oprettet; et navn der allerede findes i CRM'en springes over; kørt to gange giver ikke dubletter.
 - **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
 
 ## Åbent spørgsmål (afventer svar)
