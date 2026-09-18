@@ -19,9 +19,11 @@ No PR pipeline, no multi-role framework — just enough structure to avoid repea
 
 ## Known rules (keep this list updated)
 - `seedDefaultsIfEmpty()` must always stay disabled.
-- Google Sign-In on GitHub Pages is unreliable (popup and redirect both fail) — security on this app is currently UNRESOLVED. The team uses the unsecured version. Do not consider this "done."
 - All form labels must be in English.
 - Correct partner names: Albatros Travel, Asien Travel, DANexplore, Unique Travel.
+- Auth (2026-09-18 decision): real Firebase Auth (email/password) + Firestore Security Rules with an explicit employee-email allowlist, NOT the earlier abandoned Google Sign-In popup/redirect approach (that was unreliable on GitHub Pages). No public self-registration; Harry creates every account manually in Firebase Console. Built and tested (see STATUS.md), not deployed yet — do not assume it's live without checking STATUS.md.
+- Access control (2026-09-18, superseded same day): first built with an admin-only-delete split (only Harry could delete). Harry then explicitly asked for this to be simplified: there is NO separate admin role — every allowlisted account has the same rights (read/create/update/delete). Harry's control point is the allowlist itself (who has an account at all), not a permission tier inside the app. Don't reintroduce an admin/delete distinction without Harry asking again.
+- Presence ("who's online"): a `presence` Firestore collection, one doc per user keyed by their Firebase Auth uid, updated via a 45s heartbeat. A user counts as online if their heartbeat is under 2 minutes old — no cleanup job needed, stale docs just age out of the count.
 
 ## Model choice
 - Default to the standard model (Sonnet) for normal fixes and features.
