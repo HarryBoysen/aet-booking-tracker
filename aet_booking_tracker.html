@@ -146,12 +146,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <div class="loading" id="loading"><i class="ti ti-loader" style="animation:spin 1s linear infinite;font-size:20px"></i> Connecting...</div>
 
-<div class="name-screen" id="nameScreen" style="display:none">
+<div class="name-screen" id="loginScreen" style="display:none">
   <div class="name-box">
-    <h2>Welcome to AET Booking Tracker</h2>
-    <p>Enter your name to get started. This will be shown on your bookings and notes.</p>
-    <input type="text" id="nameInput" placeholder="Your name" maxlength="30">
-    <button class="btn primary" style="width:100%;justify-content:center;height:42px;font-size:14px" onclick="saveName()">Start</button>
+    <h2>AET Booking Tracker</h2>
+    <p>Sign in with your AET email to continue.</p>
+    <input type="email" id="loginEmail" placeholder="you@example.com" autocomplete="username">
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+    <div id="loginError" style="display:none;color:#a32d2d;font-size:12px;margin:-4px 0 12px;text-align:left"></div>
+    <button class="btn primary" id="loginBtn" style="width:100%;justify-content:center;height:42px;font-size:14px" onclick="doLogin()">Sign in</button>
   </div>
 </div>
 
@@ -159,7 +161,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
     <div>
       <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
-      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="changeName()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(change)</button></div>
+      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="doLogout()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(sign out)</button> &nbsp;·&nbsp; <span id="onlineCount" title="" style="color:#888"></span></div>
     </div>
   </div>
 
@@ -378,7 +380,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAIOaGt05ggJD9mcAa96OymC8_U55O6xQU",
@@ -391,6 +394,28 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+
+// Friendly names for the sign-in accounts, shown in the UI instead of the raw
+// email. The email itself (from Firebase Auth) stays the authoritative identity.
+const USER_DISPLAY_NAMES = {
+  'brian.harry.boysen@gmail.com': 'Harry',
+  'tumma.supha@gmail.com': 'Supha',
+  'rsvnasiaevolutiontour@gmail.com': 'Reservations',
+  'tourevolution@gmail.com': 'Tour Evolution',
+  'salesasiaevolutiontour@gmail.com': 'Sales',
+  'sales02asiaevolutiontour@gmail.com': 'Sales 2',
+  'sales03asiaevolutiontour@gmail.com': 'Sales 3',
+  'sales04asiaevolutiontour@gmail.com': 'Sales 4',
+  'sales05asiaevolutiontour@gmail.com': 'Sales 5',
+  'kcasiaevolutiontour@gmail.com': 'Koh Chang',
+  'asiaevolutionlanta@gmail.com': 'Koh Lanta',
+  'ac.evolutiontour@gmail.com': 'Accounting',
+  'asiaevolutiontourservices@gmail.com': 'Services',
+  'aetchiangmai@gmail.com': 'Chiang Mai',
+  'bkkasiaevolutiontour@gmail.com': 'Bangkok'
+};
+function displayNameFor(email) { return (email && USER_DISPLAY_NAMES[email]) || email || ''; }
 
 let bookings = [];
 let partners = [];
@@ -406,7 +431,10 @@ let expandedCards = new Set();
 let expandedAllotments = new Set();
 let expandedStatsHotels = new Set();
 let lastStatsRows = [];
-let currentUser = localStorage.getItem('aet_username') || '';
+let currentUserEmail = '';
+let currentUserName = '';
+let presenceEntries = {}; // uid -> {email, name, lastSeen(ms)}
+let presenceHeartbeatTimer = null;
 let hotelCount = 0;
 let crmType = 'partners'; // 'partners' | 'hotels'
 let currentCrmDetail = null; // {type, id}
@@ -415,28 +443,66 @@ let editingSopId = null;
 let sopCategoryFilter = '';
 let editingAllotmentId = null;
 
-document.getElementById('loading').style.display = 'none';
-if (!currentUser) {
-  document.getElementById('nameScreen').style.display = 'flex';
-} else {
-  startApp();
-}
+// Nothing is fetched or shown until Firebase confirms the sign-in state.
+let appStarted = false;
+onAuthStateChanged(auth, (user) => {
+  document.getElementById('loading').style.display = 'none';
+  if (!user) {
+    appStarted = false;
+    stopPresenceHeartbeat();
+    document.getElementById('mainApp').style.display = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('loginBtn').disabled = false;
+    document.getElementById('loginBtn').textContent = 'Sign in';
+    return;
+  }
+  currentUserEmail = user.email;
+  currentUserName = displayNameFor(currentUserEmail);
+  document.getElementById('loginScreen').style.display = 'none';
+  if (!appStarted) { appStarted = true; startApp(); }
+});
 
-window.saveName = function() {
-  const name = document.getElementById('nameInput').value.trim();
-  if (!name) { alert('Please enter your name.'); return; }
-  localStorage.setItem('aet_username', name);
-  currentUser = name;
-  document.getElementById('nameScreen').style.display = 'none';
-  startApp();
+window.doLogin = function() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.style.display = 'none';
+  if (!email || !password) {
+    errEl.textContent = 'Please enter both email and password.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const btn = document.getElementById('loginBtn');
+  btn.disabled = true;
+  btn.textContent = 'Signing in…';
+  signInWithEmailAndPassword(auth, email, password).catch((e) => {
+    btn.disabled = false;
+    btn.textContent = 'Sign in';
+    let msg = 'Could not sign in. Please try again.';
+    if (e.code === 'auth/invalid-credential' || e.code === 'auth/wrong-password' || e.code === 'auth/user-not-found') {
+      msg = 'Wrong email or password.';
+    } else if (e.code === 'auth/too-many-requests') {
+      msg = 'Too many attempts. Please wait a moment and try again.';
+    } else if (e.code === 'auth/invalid-email') {
+      msg = 'Please enter a valid email address.';
+    }
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  });
 }
-window.changeName = function() { localStorage.removeItem('aet_username'); location.reload(); }
-document.getElementById('nameInput').addEventListener('keydown', e => { if (e.key === 'Enter') window.saveName(); });
+document.getElementById('loginPassword').addEventListener('keydown', e => { if (e.key === 'Enter') window.doLogin(); });
+document.getElementById('loginEmail').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginPassword').focus(); });
+
+window.doLogout = function() {
+  stopPresenceHeartbeat();
+  signOut(auth);
+}
 
 function startApp() {
   document.getElementById('mainApp').style.display = 'block';
-  document.getElementById('currentUserLabel').textContent = currentUser;
-  document.getElementById('f-agent').value = currentUser;
+  document.getElementById('currentUserLabel').textContent = currentUserName;
+  document.getElementById('f-agent').value = currentUserName;
+  startPresenceHeartbeat();
 
   onSnapshot(collection(db, 'bookings'), (snap) => {
     bookings = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -475,7 +541,47 @@ function startApp() {
     renderStats();
   });
 
+  onSnapshot(collection(db, 'presence'), (snap) => {
+    presenceEntries = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      const seenAt = data.lastSeen && data.lastSeen.toMillis ? data.lastSeen.toMillis() : (data.lastSeen || 0);
+      presenceEntries[d.id] = { email: data.email, name: displayNameFor(data.email), lastSeen: seenAt };
+    });
+    renderOnlineCount();
+  });
+  setInterval(renderOnlineCount, 30 * 1000); // re-check staleness even if no snapshot arrives
+
   // seedDefaultsIfEmpty(); // DISABLED - keep manual partner names (Albatros Travel, Asien Travel, DANexplore, Unique Travel)
+}
+
+// ---------- Presence ("who's online") ----------
+// Every signed-in user writes a heartbeat to their own presence doc (doc id = uid)
+// every 45s. A user counts as "online" if their heartbeat is under 2 minutes old.
+// No cleanup job needed: stale docs simply drop out of the online count.
+const PRESENCE_STALE_MS = 2 * 60 * 1000;
+function startPresenceHeartbeat() {
+  const beat = () => {
+    if (!auth.currentUser) return;
+    setDoc(doc(db, 'presence', auth.currentUser.uid), {
+      email: currentUserEmail,
+      lastSeen: serverTimestamp()
+    }).catch(() => {}); // best-effort; presence is not critical data
+  };
+  beat();
+  presenceHeartbeatTimer = setInterval(beat, 45 * 1000);
+}
+function stopPresenceHeartbeat() {
+  if (presenceHeartbeatTimer) { clearInterval(presenceHeartbeatTimer); presenceHeartbeatTimer = null; }
+}
+function renderOnlineCount() {
+  const el = document.getElementById('onlineCount');
+  if (!el) return;
+  const now = Date.now();
+  const online = Object.values(presenceEntries).filter(p => p.lastSeen && (now - p.lastSeen) < PRESENCE_STALE_MS);
+  const names = online.map(p => p.name).sort();
+  el.textContent = online.length === 1 ? '1 online now' : online.length + ' online now';
+  el.title = names.join(', ');
 }
 
 async function seedDefaultsIfEmpty() {
@@ -1218,7 +1324,7 @@ window.openModal = function(b) {
   hotelCount = 0;
   document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
   document.getElementById('f-ref').value = b ? b.ref : '';
-  document.getElementById('f-agent').value = b ? b.agent : currentUser;
+  document.getElementById('f-agent').value = b ? b.agent : currentUserName;
   document.getElementById('f-guest').value = b ? b.guest : '';
   document.getElementById('f-pax').value = b && b.pax ? b.pax : '';
   refreshPartnerDropdown();
@@ -1912,7 +2018,7 @@ window.addCrmNote = async function() {
   const item = list.find(x => x.id === currentCrmDetail.id);
   if (!item) return;
   const notes = item.notes || [];
-  notes.push({ author: currentUser, date: new Date().toISOString().split('T')[0], tag, text });
+  notes.push({ author: currentUserName, date: new Date().toISOString().split('T')[0], tag, text });
   item.notes = notes;
   await setDoc(doc(db, collectionName, item.id), item);
 }
@@ -1978,7 +2084,7 @@ window.saveTrip = async function() {
     // Create new trip
     tripData.id = 't_' + Date.now();
     tripData.created = new Date().toISOString().split('T')[0];
-    tripData.author = currentUser;
+    tripData.author = currentUserName;
     await setDoc(doc(db, 'trips', tripData.id), tripData);
   }
   
@@ -2026,9 +2132,9 @@ window.saveSop = async function() {
   const sop = {
     id: editingSopId || ('s_' + Date.now()),
     title, category, content,
-    author: existing ? existing.author : currentUser,
+    author: existing ? existing.author : currentUserName,
     createdDate: existing ? existing.createdDate : new Date().toISOString().split('T')[0],
-    updatedBy: currentUser,
+    updatedBy: currentUserName,
     updatedDate: new Date().toISOString().split('T')[0]
   };
   await setDoc(doc(db, 'sops', sop.id), sop);
