@@ -338,7 +338,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal-bg" id="crmModal" onclick="bgClose(event,'crmModal')">
 <div class="modal">
   <h2 id="crmModalTitle">New partner</h2>
-  <div class="field"><label>Name</label><input id="crm-name" placeholder="e.g. Albatros Travel"></div>
+  <div class="field"><label>Name</label><input id="crm-name" placeholder="e.g. Albatros Travel"><div id="crm-name-note" style="display:none;font-size:11px;color:#888;margin-top:4px"></div></div>
   <div class="row2">
     <div class="field"><label>Main contact person(s)</label><input id="crm-contact" placeholder="e.g. Lha, Kong"></div>
     <div class="field"><label>Email / Phone</label><input id="crm-emailphone" placeholder="e.g. lha@exo.com"></div>
@@ -401,7 +401,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal">
   <h2 id="allotmentModalTitle">New Allotment</h2>
   <div class="row2">
-    <div class="field"><label>Hotel Name</label><input id="allot-hotel" oninput="suggestAllotmentAliases()" placeholder="e.g. Rawi Warin Resort"></div>
+    <div class="field"><label>Hotel Name</label><input id="allot-hotel" oninput="suggestAllotmentAliases()" placeholder="e.g. Rawi Warin Resort"><div id="allot-hotel-note" style="display:none;font-size:11px;color:#888;margin-top:4px">Only admin can rename a hotel here — it affects existing bookings. Use "Also known as" below for a spelling variant instead.</div></div>
     <div class="field"><label>Destination</label><input id="allot-destination" list="allotmentDestinations" placeholder="e.g. Koh Lanta"></div>
   </div>
   <div class="field"><label>Also known as (other spellings used in bookings, comma-separated)</label><input id="allot-aliases" placeholder="e.g. Koh Chang Paradise Resort & Spa, Koh Chang Paradise"></div>
@@ -1326,6 +1326,102 @@ function knownHotelNames() {
   });
   return [...seen.values()].sort();
 }
+// How many existing bookings / allotments currently use this exact hotel name (case-insensitive) —
+// shown as a heads-up before an admin renames or deletes it, per Harry's request (2026-09-18) for
+// a safe way to fix "the same hotel spelled 2 different ways" after the fact, not just prevent it
+// going forward.
+function countHotelUsage(name) {
+  const n = (name || '').trim().toLowerCase();
+  if (!n) return { bookingsCount: 0, allotmentsCount: 0 };
+  const bookingsCount = bookings.filter(b => (b.hotels || []).some(h => (h.name || '').trim().toLowerCase() === n)).length;
+  const allotmentsCount = allotments.filter(a => (a.hotelName || '').trim().toLowerCase() === n || (a.aliases || []).some(x => (x || '').trim().toLowerCase() === n)).length;
+  return { bookingsCount, allotmentsCount };
+}
+// Admin-only rename that actually merges a duplicate hotel into one: rewrites the name on every
+// existing booking's hotel line and every allotment (hotelName + aliases) that matches the old
+// spelling, so the fix is real everywhere, not just on the one record being edited. Excludes a
+// specific hotelsCrm/allotment id from its own loop when the caller is already saving that record
+// directly (avoids a redundant/racy double-write on the very record being renamed).
+async function renameHotelEverywhere(oldName, newName, opts) {
+  opts = opts || {};
+  const on = (oldName || '').trim().toLowerCase();
+  let bookingsUpdated = 0, allotmentsUpdated = 0, crmUpdated = 0;
+  for (const b of bookings) {
+    let changed = false;
+    const newHotels = (b.hotels || []).map(h => {
+      if ((h.name || '').trim().toLowerCase() === on) { changed = true; return { ...h, name: newName }; }
+      return h;
+    });
+    if (changed) {
+      const updated = { ...b, hotels: newHotels, history: (b.history || []).slice() };
+      updated.history.push({ by: currentUserName, date: new Date().toISOString(), changes: [`Hotel renamed (admin merge): "${oldName}" → "${newName}"`] });
+      await setDoc(doc(db, 'bookings', b.id), updated);
+      bookingsUpdated++;
+    }
+  }
+  for (const a of allotments) {
+    if (a.id === opts.excludeAllotmentId) continue;
+    let changed = false;
+    let hn = a.hotelName;
+    if ((hn || '').trim().toLowerCase() === on) { hn = newName; changed = true; }
+    const seen = new Set();
+    const newAliases = [];
+    (a.aliases || []).forEach(x => {
+      let v = x;
+      if ((x || '').trim().toLowerCase() === on) { v = newName; changed = true; }
+      const k = (v || '').trim().toLowerCase();
+      if (!k || k === (hn || '').trim().toLowerCase() || seen.has(k)) return;
+      seen.add(k); newAliases.push(v);
+    });
+    if (changed) { await setDoc(doc(db, 'allotments', a.id), { ...a, hotelName: hn, aliases: newAliases }); allotmentsUpdated++; }
+  }
+  for (const h of hotelsCrm) {
+    if (h.id === opts.excludeHotelsCrmId) continue;
+    if ((h.name || '').trim().toLowerCase() === on) { await setDoc(doc(db, 'hotelsCrm', h.id), { ...h, name: newName }); crmUpdated++; }
+  }
+  return { bookingsUpdated, allotmentsUpdated, crmUpdated };
+}
+// How many existing bookings use this exact room type at this exact hotel — same heads-up idea as
+// countHotelUsage, scoped to one hotel since a room type name only has meaning within its hotel.
+function countRoomTypeUsage(hotelName, roomTypeName) {
+  const hn = (hotelName || '').trim().toLowerCase();
+  const rn = (roomTypeName || '').trim().toLowerCase();
+  if (!hn || !rn) return 0;
+  return bookings.filter(b => (b.hotels || []).some(h =>
+    (h.name || '').trim().toLowerCase() === hn && hotelRoomTypeLines(h).some(rt => (rt.roomType || '').trim().toLowerCase() === rn)
+  )).length;
+}
+// Admin-only room type rename, scoped to one hotel — rewrites the name on every existing booking's
+// matching room-type line (both the current roomTypes[] shape and the older flat roomType field) so
+// a rename genuinely merges a duplicate instead of leaving old bookings pointing at the old name.
+async function renameRoomTypeEverywhere(hotelName, oldName, newName) {
+  const hn = (hotelName || '').trim().toLowerCase();
+  const on = (oldName || '').trim().toLowerCase();
+  let bookingsUpdated = 0;
+  for (const b of bookings) {
+    let changed = false;
+    const newHotels = (b.hotels || []).map(h => {
+      if ((h.name || '').trim().toLowerCase() !== hn) return h;
+      const nh = { ...h };
+      if (h.roomTypes && h.roomTypes.length > 0) {
+        nh.roomTypes = h.roomTypes.map(rt => {
+          if ((rt.roomType || '').trim().toLowerCase() === on) { changed = true; return { ...rt, roomType: newName }; }
+          return rt;
+        });
+      } else if ((h.roomType || '').trim().toLowerCase() === on) {
+        changed = true; nh.roomType = newName;
+      }
+      return nh;
+    });
+    if (changed) {
+      const updated = { ...b, hotels: newHotels, history: (b.history || []).slice() };
+      updated.history.push({ by: currentUserName, date: new Date().toISOString(), changes: [`Room type renamed (admin merge): "${oldName}" → "${newName}" at ${hotelName}`] });
+      await setDoc(doc(db, 'bookings', b.id), updated);
+      bookingsUpdated++;
+    }
+  }
+  return bookingsUpdated;
+}
 function knownAgentNames() {
   const fromUsers = users.map(u => u.agentName).filter(Boolean);
   const fromDisplayNames = Object.values(USER_DISPLAY_NAMES);
@@ -1613,14 +1709,20 @@ window.addRoomTypeBlock = function(rt) {
   const div = document.createElement('div');
   div.className = 'rt-block';
   div.style.cssText = 'border:0.5px solid #e5e5e0;border-radius:10px;padding:10px;margin-bottom:10px';
+  // Remembers the name this room type was loaded with (blank for a brand-new line), so
+  // saveAllotment/removeRoomTypeBlock can tell a rename/removal of an EXISTING room type — which
+  // cascades to matching bookings — from just adding or discarding a never-saved line.
+  div.dataset.origName = rt ? rt.name : '';
+  const lockName = rt && !isAdminViewer();
   div.innerHTML = `
     <div class="row2" style="margin-bottom:0">
-      <div class="field" style="margin-bottom:0"><input class="rt-name" placeholder="e.g. Deluxe" list="roomTypeSuggestions" value="${esc(rt?rt.name:'')}"></div>
+      <div class="field" style="margin-bottom:0"><input class="rt-name" placeholder="e.g. Deluxe" list="roomTypeSuggestions" value="${esc(rt?rt.name:'')}"${lockName?' disabled style="background:#f5f5f2"':''}></div>
       <div style="display:flex;gap:8px;align-items:center">
         <input type="number" min="1" class="rt-qty" placeholder="Qty (used when no season periods below)" value="${rt&&rt.qty?rt.qty:''}" style="flex:1">
-        <button type="button" onclick="this.closest('.rt-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
+        <button type="button" onclick="removeRoomTypeBlock(this)" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
       </div>
     </div>
+    ${lockName ? '<div style="font-size:11px;color:#888;margin-top:4px">Only admin can rename this room type — it affects existing bookings.</div>' : ''}
     <div class="rt-periods" style="margin-top:8px"></div>
     <button type="button" class="btn" style="padding:3px 9px;font-size:11px;margin-top:2px" onclick="addRoomTypePeriodLine(this.previousElementSibling)">+ Add season period (different allotment for specific dates)</button>`;
   document.getElementById('roomtype-blocks').appendChild(div);
@@ -1642,6 +1744,25 @@ window.addRoomTypePeriodLine = function(container, p) {
       <button type="button" onclick="this.closest('.rt-period-line').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:16px"><i class="ti ti-x"></i></button>
     </div>`;
   container.appendChild(row);
+}
+
+// Removing a room-type line: a never-saved blank line (just added, no data yet) can be discarded
+// freely by anyone. Removing one that was actually loaded from a saved allotment is an admin-only
+// action with a heads-up if existing bookings still reference it (per Harry's request, 2026-09-18)
+// — same spirit as the duplicate-warning override: never silent, but doesn't block an admin who
+// knows what they're doing.
+window.removeRoomTypeBlock = function(btn) {
+  const block = btn.closest('.rt-block');
+  const origName = block.dataset.origName || '';
+  if (!origName) { block.remove(); return; }
+  if (!isAdminViewer()) { alert('Only admin can remove a room type — it may be used in existing bookings.'); return; }
+  const hotelName = document.getElementById('allot-hotel').value.trim();
+  const usage = countRoomTypeUsage(hotelName, origName);
+  const usageLine = usage > 0
+    ? `\n\nIt's currently used on ${usage} existing booking(s) — they'll keep "${origName}" as plain text, just no longer linked to this allotment's quota.`
+    : '\n\n(Not currently used on any existing booking.)';
+  if (!confirm(`Remove room type "${origName}" from this hotel's allotment?${usageLine}`)) return;
+  block.remove();
 }
 
 // While typing a hotel name in the Allotment modal, suggest other spellings already seen in
@@ -1672,7 +1793,15 @@ window.openAllotmentModal = function(id) {
   editingAllotmentId = id || null;
   const a = id ? allotments.find(x => x.id === id) : null;
   document.getElementById('allotmentModalTitle').textContent = a ? 'Edit allotment' : 'New allotment';
-  document.getElementById('allot-hotel').value = a ? a.hotelName : '';
+  const hotelEl = document.getElementById('allot-hotel');
+  hotelEl.value = a ? a.hotelName : '';
+  // Remembers the name this allotment was loaded with, so saveAllotment can tell if it was
+  // actually renamed (vs. just re-saved unchanged) and cascade the rename everywhere.
+  hotelEl.dataset.origName = a ? a.hotelName : '';
+  const lockHotelName = !!a && !isAdminViewer();
+  hotelEl.disabled = lockHotelName;
+  hotelEl.style.background = lockHotelName ? '#f5f5f2' : '';
+  document.getElementById('allot-hotel-note').style.display = lockHotelName ? '' : 'none';
   document.getElementById('allot-destination').value = a ? (a.destination||'') : '';
   document.getElementById('allot-aliases').value = a && a.aliases ? a.aliases.join(', ') : '';
   document.getElementById('roomtype-blocks').innerHTML = '';
@@ -1688,6 +1817,7 @@ window.saveAllotment = async function() {
   const destination = document.getElementById('allot-destination').value.trim();
   const aliases = document.getElementById('allot-aliases').value.split(',').map(s => s.trim()).filter(Boolean);
   const roomTypes = [];
+  const roomTypeRenames = []; // {oldName, newName} — existing room types whose name field changed
   let periodDateError = '';
   document.querySelectorAll('#roomtype-blocks .rt-block').forEach(block => {
     const name = block.querySelector('.rt-name').value.trim();
@@ -1705,9 +1835,42 @@ window.saveAllotment = async function() {
     if (!name) return;
     if (periods.length === 0 && qty <= 0) return; // nothing usable on this room type line
     roomTypes.push({ name, qty, periods });
+    const origName = block.dataset.origName || '';
+    if (origName && origName.trim() !== name) roomTypeRenames.push({ oldName: origName, newName: name });
   });
   if (periodDateError) { alert(periodDateError); return; }
   if (roomTypes.length === 0) { alert('Please add at least one room type with a quantity (or season periods).'); return; }
+
+  // Hotel/room-type rename: cascades to every existing booking (and, for the hotel name, every
+  // other allotment) using the old spelling — admin-only, since it rewrites booking data. See
+  // renameHotelEverywhere/renameRoomTypeEverywhere.
+  const origHotelName = document.getElementById('allot-hotel').dataset.origName || '';
+  const hotelRenamed = !!editingAllotmentId && !!origHotelName && origHotelName.trim() !== hotelName;
+  const bookingsHotelName = origHotelName || hotelName; // the name bookings currently carry, before any cascade below
+
+  if ((hotelRenamed || roomTypeRenames.length) && !isAdminViewer()) {
+    alert('Only admin can rename a hotel or room type here — it affects existing bookings. Ask an admin, or use "Also known as" for a spelling variant instead of renaming.');
+    return;
+  }
+  if (hotelRenamed) {
+    const usage = countHotelUsage(origHotelName);
+    const usageLine = (usage.bookingsCount || usage.allotmentsCount) ? `\n\nThis will update ${usage.bookingsCount} existing booking(s) and ${usage.allotmentsCount} other allotment(s) to match.` : '\n\n(Not currently used on any existing booking or allotment.)';
+    if (!confirm(`Rename hotel "${origHotelName}" to "${hotelName}"?${usageLine}`)) return;
+  }
+  for (const r of roomTypeRenames) {
+    const usage = countRoomTypeUsage(bookingsHotelName, r.oldName);
+    const usageLine = usage > 0 ? `\n\nThis will update ${usage} existing booking(s) to match.` : '\n\n(Not currently used on any existing booking.)';
+    if (!confirm(`Rename room type "${r.oldName}" to "${r.newName}" at ${hotelName}?${usageLine}`)) return;
+  }
+
+  if (hotelRenamed) {
+    const result = await renameHotelEverywhere(origHotelName, hotelName, { excludeAllotmentId: editingAllotmentId });
+    showToast(`✅ Hotel renamed — ${result.bookingsUpdated} booking(s), ${result.allotmentsUpdated} other allotment(s) updated to match`);
+  }
+  for (const r of roomTypeRenames) {
+    await renameRoomTypeEverywhere(hotelName, r.oldName, r.newName);
+  }
+
   const id = editingAllotmentId || ('a_' + Date.now());
   await setDoc(doc(db, 'allotments', id), { hotelName, destination, aliases, roomTypes });
   window.closeModal('allotmentModal');
@@ -2646,7 +2809,17 @@ function renderCrm() {
 window.openCrmModal = function(item) {
   editingCrmId = item ? item.id : null;
   document.getElementById('crmModalTitle').textContent = item ? 'Edit ' + (crmType==='partners'?'partner':'hotel') : (crmType==='partners' ? 'New partner' : 'New hotel');
-  document.getElementById('crm-name').value = item ? item.name : '';
+  const nameEl = document.getElementById('crm-name');
+  const nameNote = document.getElementById('crm-name-note');
+  nameEl.value = item ? item.name : '';
+  // Renaming an existing hotel rewrites its name on every matching booking/allotment too (see
+  // saveCrmEntity), so — per Harry's request (2026-09-18) — that's an admin-only action. Adding a
+  // brand-new hotel, and editing Partners, stay open to everyone as before.
+  const lockName = crmType === 'hotels' && item && !isAdminViewer();
+  nameEl.disabled = lockName;
+  nameEl.style.background = lockName ? '#f5f5f2' : '';
+  if (lockName) { nameNote.style.display = ''; nameNote.textContent = 'Only admin can rename a hotel — it affects existing bookings.'; }
+  else { nameNote.style.display = 'none'; }
   document.getElementById('crm-contact').value = item ? (item.contact||'') : '';
   document.getElementById('crm-emailphone').value = item ? (item.emailphone||'') : '';
   document.getElementById('crm-info').value = item ? (item.info||'') : '';
@@ -2667,6 +2840,29 @@ window.saveCrmEntity = async function() {
     info: document.getElementById('crm-info').value.trim(),
     notes: existing ? (existing.notes||[]) : []
   };
+
+  // Hotel rename: cascades to every existing booking/allotment using the old spelling, so it's a
+  // real merge, not just a relabel of this one card — admin-only, since it rewrites booking data.
+  if (crmType === 'hotels' && existing && name !== (existing.name||'').trim()) {
+    if (!isAdminViewer()) { alert('Only admin can rename a hotel — this affects existing bookings.'); return; }
+    const usage = countHotelUsage(existing.name);
+    const mergeTarget = hotelsCrm.find(h => h.id !== existing.id && h.name.trim().toLowerCase() === name.toLowerCase());
+    const usageLine = (usage.bookingsCount || usage.allotmentsCount) ? `\n\nThis will update ${usage.bookingsCount} existing booking(s) and ${usage.allotmentsCount} allotment(s) to match.` : '\n\n(Not currently used on any existing booking or allotment.)';
+    const mergeLine = mergeTarget ? `\n\nA hotel named "${name}" already exists — they'll be merged into one record, with notes combined.` : '';
+    if (!confirm(`Rename "${existing.name}" to "${name}"?${usageLine}${mergeLine}`)) return;
+    const result = await renameHotelEverywhere(existing.name, name, { excludeHotelsCrmId: existing.id });
+    if (mergeTarget) {
+      const mergedNotes = [...(mergeTarget.notes||[]), ...(existing.notes||[])];
+      await setDoc(doc(db, 'hotelsCrm', mergeTarget.id), { ...mergeTarget, notes: mergedNotes });
+      await deleteDoc(doc(db, 'hotelsCrm', existing.id));
+      window.closeModal('crmModal');
+      showToast(`✅ Merged into existing "${name}" — ${result.bookingsUpdated} booking(s), ${result.allotmentsUpdated} allotment(s) updated, notes combined`);
+      window.backToCrmList();
+      return;
+    }
+    showToast(`✅ Renamed — ${result.bookingsUpdated} booking(s), ${result.allotmentsUpdated} allotment(s) updated to match`);
+  }
+
   await setDoc(doc(db, collectionName, entity.id), entity);
   window.closeModal('crmModal');
 }
@@ -2790,8 +2986,18 @@ window.addCrmNote = async function() {
 }
 
 window.deleteCrmEntity = async function() {
-  if (!confirm('Delete this record and all its notes? This cannot be undone.')) return;
   const collectionName = currentCrmDetail.type === 'partners' ? 'partners' : 'hotelsCrm';
+  if (currentCrmDetail.type === 'hotels') {
+    if (!isAdminViewer()) { alert('Only admin can delete a hotel record.'); return; }
+    const item = hotelsCrm.find(x => x.id === currentCrmDetail.id);
+    const usage = item ? countHotelUsage(item.name) : { bookingsCount: 0, allotmentsCount: 0 };
+    const usageNote = (usage.bookingsCount || usage.allotmentsCount)
+      ? `\n\nNote: this name is still used on ${usage.bookingsCount} booking(s) and ${usage.allotmentsCount} allotment(s) — deleting this record only removes the Hotels-list contact card, those bookings/allotments keep the name as-is.`
+      : '';
+    if (!confirm(`Delete this record and all its notes? This cannot be undone.${usageNote}`)) return;
+  } else {
+    if (!confirm('Delete this record and all its notes? This cannot be undone.')) return;
+  }
   await deleteDoc(doc(db, collectionName, currentCrmDetail.id));
   window.backToCrmList();
 }
