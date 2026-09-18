@@ -110,6 +110,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .field input,.field select,.field textarea{width:100%;padding:8px 11px;font-size:13px;border:0.5px solid #ccc;border-radius:8px;background:#fff;color:#1a1a1a;outline:none;font-family:inherit}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:#888}
 .field textarea{resize:vertical;min-height:70px}
+.field-invalid{border-color:#c0392b !important;background:#fff8f8 !important}
+.field-error-msg{color:#c0392b;font-size:11px;margin-top:3px;font-weight:500}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
 .modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:0.5px solid #eee}
@@ -304,14 +306,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal-bg" id="modal" onclick="bgClose(event,'modal')">
 <div class="modal">
   <h2 id="modal-title">New Booking</h2>
+  <div id="modalFormError" class="field-error-msg" style="display:none;margin-bottom:12px;font-size:13px"></div>
   <div class="row3">
     <div class="field"><label>Booking Reference</label><input id="f-ref" placeholder="AET-2026-001"></div>
-    <div class="field"><label>Your Name (Agent)</label><input id="f-agent" placeholder="Name"></div>
+    <div class="field"><label>Your Name (Agent)</label><input id="f-agent" list="agentSuggestions" placeholder="Name"></div>
     <div class="field"><label>Guest / Group Name</label><input id="f-guest" placeholder="Guest or group name"></div>
   </div>
   <div class="row2">
-    <div class="field"><label>Partner (Optional)</label>
-      <select id="f-partner"><option value="">— None —</option></select>
+    <div class="field"><label>Partner</label>
+      <select id="f-partner"><option value="">— Select partner —</option></select>
     </div>
     <div class="field"><label>No. of Pax</label><input type="number" min="1" id="f-pax" placeholder="e.g. 4"></div>
   </div>
@@ -413,6 +416,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- Possible Duplicate Modal -->
+<div class="modal-bg" id="duplicateModal" onclick="if(event.target===this)resolveDuplicateModal(false)">
+<div class="modal">
+  <h2>⚠ Possible duplicate booking</h2>
+  <div id="duplicateInfo" style="font-size:13px;color:#555;margin-bottom:14px"></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="resolveDuplicateModal(false)">Go back and check</button>
+    <button class="btn primary" id="duplicateOverrideBtn" style="display:none" onclick="resolveDuplicateModal(true)">Save anyway</button>
+  </div>
+</div>
+</div>
+
 <!-- Escalate Modal -->
 <div class="modal-bg" id="escalateModal" onclick="bgClose(event,'escalateModal')">
 <div class="modal">
@@ -457,6 +472,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <button class="btn" onclick="loadDefaultTeam()" title="Fills in the 15 AET accounts with their real names">Load default team</button>
     <button class="btn" onclick="closeModal('teamModal')">Close</button>
     <button class="btn primary" onclick="saveTeamMember()">Save mapping</button>
+  </div>
+  <div class="section-divider">Follow-up thresholds</div>
+  <p style="font-size:12px;color:#888;margin:-8px 0 14px">
+    Controls when a supplier follow-up turns yellow ("Follow-up due") and red ("Overdue — escalation required") on My Action List. Counted in days without a reply, Thailand time. Default: 2 / 4.
+  </p>
+  <div class="row2">
+    <div class="field"><label>Days until "Follow-up due" (yellow)</label><input type="number" min="1" id="settings-amber-days" placeholder="2"></div>
+    <div class="field"><label>Days until "Overdue" (red)</label><input type="number" min="1" id="settings-red-days" placeholder="4"></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn primary" onclick="saveFollowupSettings()">Save thresholds</button>
   </div>
 </div>
 </div>
@@ -515,6 +541,10 @@ let dismissedDuplicates = [];
 let users = []; // Firestore 'users' collection: {id, email, displayName, agentName, role}
 let actionViewAll = false; // when true (admin only), My Action List shows everyone's tasks
 let escalateContext = null; // {bookingId, hotelId} while the Escalate modal is open
+// Firestore 'settings' collection, doc id 'followup': admin-editable follow-up thresholds.
+// Defaults below are used until/unless that doc exists.
+let followupSettings = { amberThresholdDays: 2, redThresholdDays: 4 };
+let duplicateOverrideContext = null; // {resolve} while the duplicate-warning modal is open
 
 let editId = null;
 let currentFilter = 'all';
@@ -601,9 +631,25 @@ function startApp() {
     renderStats();
     renderAllotments();
     renderActionList();
+    refreshAgentSuggestions();
+    refreshRoomTypeSuggestions();
   });
   onSnapshot(collection(db, 'users'), (snap) => {
     users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderActionList();
+    renderTeamList();
+    refreshAgentSuggestions();
+  });
+  onSnapshot(collection(db, 'settings'), (snap) => {
+    const followupDoc = snap.docs.find(d => d.id === 'followup');
+    if (followupDoc) {
+      const data = followupDoc.data();
+      followupSettings = {
+        amberThresholdDays: Number(data.amberThresholdDays) || 2,
+        redThresholdDays: Number(data.redThresholdDays) || 4
+      };
+    }
+    render();
     renderActionList();
     renderTeamList();
   });
@@ -622,6 +668,7 @@ function startApp() {
     hotelsCrm = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderCrm();
     if (currentCrmDetail && currentCrmDetail.type === 'hotels') renderCrmDetail();
+    refreshRoomTypeSuggestions();
   });
   onSnapshot(collection(db, 'sops'), (snap) => {
     sops = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -709,9 +756,15 @@ window.switchTab = function(tab) {
 }
 
 /* ---------- Helpers ---------- */
-function daysSince(dateStr) { if (!dateStr) return null; return Math.floor((new Date() - new Date(dateStr)) / 86400000); }
-function daysBetween(a,b) { if(!a||!b) return null; return Math.floor((new Date(b) - new Date(a)) / 86400000); }
-function hotelNeedsFollowup(h) { return h.status === 'pending' && !h.reply && daysSince(h.sent) >= 2; }
+// Asia/Bangkok is UTC+7 year-round (no DST) — used as the one shared "today" for all follow-up
+// timing, so two staff in different timezones (Denmark vs Thailand) always see the same day-count
+// instead of it depending on whose local clock the browser happens to read.
+function thailandTodayStr() { return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }); }
+function dateToDayNumber(dateStr) { if (!dateStr) return null; const d = new Date(dateStr + 'T00:00:00Z'); return isNaN(d.getTime()) ? null : Math.floor(d.getTime() / 86400000); }
+function daysSince(dateStr) { const a = dateToDayNumber(dateStr); return a === null ? null : dateToDayNumber(thailandTodayStr()) - a; }
+function daysBetween(a,b) { const da = dateToDayNumber(a), db = dateToDayNumber(b); return (da === null || db === null) ? null : db - da; }
+function addDaysToDateStr(dateStr, days) { const n = dateToDayNumber(dateStr); if (n === null) return null; return new Date((n + days) * 86400000).toISOString().split('T')[0]; }
+function hotelNeedsFollowup(h) { return h.status === 'pending' && !h.reply && daysSince(h.sent) >= followupSettings.amberThresholdDays; }
 function bookingHasAlert(b) { return (b.hotels||[]).some(hotelNeedsFollowup); }
 function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
 function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
@@ -751,16 +804,33 @@ function actionListRows(viewingAll) {
       }
       const base = { b, h, responsible };
 
-      if (hotelNeedsFollowup(h)) {
+      // Rule-based follow-up (spec point 3): status computed purely from h.sent/h.reply/h.status —
+      // never from a manually-typed status word — using Thailand-time day counts and admin-editable
+      // thresholds (followupSettings, default 2/4 days). A confirmed or cancelled hotel line can
+      // never land here, since both branches require status === 'pending'.
+      if (h.status === 'pending' && h.sent && !h.reply) {
         const days = daysSince(h.sent);
-        const severity = days > 2 ? 'red' : 'amber';
-        out.followup.push({ ...base, category: 'followup', severity,
-          missing: severity === 'red' ? 'Follow-up overdue' : 'Follow-up due today',
-          waitedLabel: `Waiting ${days}d for reply`, sortDays: days });
-      } else if (h.status === 'pending' && h.sent && !h.reply) {
-        const days = daysSince(h.sent);
-        out.pending.push({ ...base, category: 'pending', severity: 'neutral',
-          missing: 'Awaiting supplier reply', waitedLabel: `Waiting ${days}d for reply`, sortDays: days });
+        const amberAt = followupSettings.amberThresholdDays;
+        const redAt = followupSettings.redThresholdDays;
+        if (days >= redAt) {
+          out.followup.push({ ...base, category: 'followup', severity: 'red',
+            missing: 'Overdue — escalation required',
+            waitedLabel: `Sent ${days}d ago`,
+            dueLabel: `Overdue since ${addDaysToDateStr(h.sent, redAt)} — escalation required`,
+            sortDays: days });
+        } else if (days >= amberAt) {
+          out.followup.push({ ...base, category: 'followup', severity: 'amber',
+            missing: 'Follow-up due',
+            waitedLabel: `Sent ${days}d ago`,
+            dueLabel: `Next: escalate if no reply by ${addDaysToDateStr(h.sent, redAt)}`,
+            sortDays: days });
+        } else {
+          out.pending.push({ ...base, category: 'pending', severity: 'neutral',
+            missing: 'Awaiting reply',
+            waitedLabel: `Sent ${days}d ago`,
+            dueLabel: `Next: follow-up due ${addDaysToDateStr(h.sent, amberAt)}`,
+            sortDays: days });
+        }
       }
 
       const depPending = !!(h.deposit && h.deposit.required && !h.deposit.paid);
@@ -769,7 +839,7 @@ function actionListRows(viewingAll) {
         const missingParts = [];
         if (depPending) missingParts.push('Deposit pending');
         if (ccPending) missingParts.push('Credit card required');
-        const daysToCheckin = h.checkin ? daysBetween(new Date().toISOString().split('T')[0], h.checkin) : null;
+        const daysToCheckin = h.checkin ? daysBetween(thailandTodayStr(), h.checkin) : null;
         let severity = 'neutral';
         if (daysToCheckin !== null && daysToCheckin <= 3) severity = 'red';
         else {
@@ -802,6 +872,7 @@ function actionRowHtml(r, viewingAll) {
       <div class="action-row-title">${esc(r.b.ref)} — ${esc(r.b.guest)}</div>
       <div class="action-row-sub">${esc(r.h.name)} · Check-in ${r.h.checkin || '—'}</div>
       <div class="action-row-waited">${esc(r.waitedLabel)}</div>
+      ${r.dueLabel ? `<div class="action-row-waited" style="color:#888">${esc(r.dueLabel)}</div>` : ''}
       <div style="margin-top:4px"><span class="badge b-${r.severity}">${esc(r.missing)}</span> ${agentTag}</div>
     </div>
     <div class="action-row-actions">
@@ -916,8 +987,18 @@ window.openTeamModal = function() {
   document.getElementById('team-displayname').value = '';
   document.getElementById('team-agentname').value = '';
   document.getElementById('team-role').value = 'staff';
+  document.getElementById('settings-amber-days').value = followupSettings.amberThresholdDays;
+  document.getElementById('settings-red-days').value = followupSettings.redThresholdDays;
   renderTeamList();
   document.getElementById('teamModal').classList.add('open');
+}
+
+window.saveFollowupSettings = async function() {
+  const amber = parseInt(document.getElementById('settings-amber-days').value) || 2;
+  const red = parseInt(document.getElementById('settings-red-days').value) || 4;
+  if (red <= amber) { alert('The "Overdue" threshold must be greater than the "Follow-up due" threshold.'); return; }
+  await setDoc(doc(db, 'settings', 'followup'), { amberThresholdDays: amber, redThresholdDays: red });
+  showToast('✅ Follow-up thresholds saved');
 }
 
 window.editTeamMember = function(id) {
@@ -1228,19 +1309,132 @@ window.toggleAllotmentExpand = function(id) {
   renderAllotments();
 }
 
+// Master list of known hotel/supplier names: allotments (incl. their aliases) + the CRM Hotels
+// list + names already used on bookings. This backs both the autocomplete datalist AND the
+// case-insensitive normalization in saveBooking (so "sherly"/"Sherly"-style typos collapse onto
+// the one canonical spelling instead of silently creating a look-alike duplicate).
+function knownHotelNames() {
+  const fromAllotments = allotments.flatMap(a => [a.hotelName, ...((a.aliases)||[])]).filter(Boolean);
+  const fromCrm = hotelsCrm.map(h => h.name).filter(Boolean);
+  const fromBookings = bookings.flatMap(b => (b.hotels||[]).map(h => h.name)).filter(Boolean);
+  // De-dupe case-insensitively, preferring the CRM/allotment master-data spelling over whatever
+  // was free-typed on a booking, since that's the authoritative source.
+  const seen = new Map();
+  [...fromAllotments, ...fromCrm, ...fromBookings].forEach(n => {
+    const key = n.trim().toLowerCase();
+    if (key && !seen.has(key)) seen.set(key, n.trim());
+  });
+  return [...seen.values()].sort();
+}
+function knownAgentNames() {
+  const fromUsers = users.map(u => u.agentName).filter(Boolean);
+  const fromDisplayNames = Object.values(USER_DISPLAY_NAMES);
+  const fromBookings = bookings.map(b => b.agent).filter(Boolean);
+  const seen = new Map();
+  [...fromUsers, ...fromDisplayNames, ...fromBookings].forEach(n => {
+    const key = n.trim().toLowerCase();
+    if (key && !seen.has(key)) seen.set(key, n.trim());
+  });
+  return [...seen.values()].sort();
+}
+// Hotel/supplier is a real dropdown (like Partner), not free text — so one hotel can never end up
+// spelled two different ways across bookings. currentName is kept selectable even if it isn't in
+// the known list yet (an older, free-typed booking being edited), so editing never silently loses
+// or rewrites it; it's just not the sort of thing you'd pick when starting a new line.
+function hotelOptionsHtml(currentName) {
+  const known = knownHotelNames();
+  const cur = (currentName || '').trim();
+  const curInList = cur && known.some(n => n.toLowerCase() === cur.toLowerCase());
+  let opts = `<option value="">— Select hotel / supplier —</option>`;
+  if (cur && !curInList) opts += `<option value="${esc(cur)}" selected>${esc(cur)} (not yet in Hotels list)</option>`;
+  opts += known.map(n => `<option value="${esc(n)}"${(curInList && n.toLowerCase()===cur.toLowerCase())?' selected':''}>${esc(n)}</option>`).join('');
+  opts += `<option value="__new">+ Add new hotel...</option>`;
+  return opts;
+}
+window.onHotelSelectChange = function(sel) {
+  const block = sel.closest('.hotel-block');
+  const newEl = block.querySelector('.hf-name-new');
+  if (sel.value === '__new') { newEl.style.display = ''; newEl.value = ''; newEl.focus(); }
+  else { newEl.style.display = 'none'; newEl.value = ''; }
+  refreshRoomTypeLineOptions(block);
+}
+// The name currently entered for a hotel-block's Hotel / Supplier field, whether picked from the
+// dropdown or being freshly typed into "+ Add new hotel...".
+function currentHotelBlockName(block) {
+  const sel = block.querySelector('.hf-hotel-select');
+  if (!sel) return '';
+  if (sel.value === '__new') return (block.querySelector('.hf-name-new') || {}).value || '';
+  return sel.value || '';
+}
+// Room type is a dropdown too, scoped to whichever hotel is currently selected on this line — same
+// spelling-safety idea as Hotel/Supplier. Unlike hotels, a room type has no independent master
+// record (it only lives inside an allotment's roomTypes array, per-hotel), so a freshly-typed new
+// room type is NOT auto-saved into any allotment here — that risks introducing a qty:0 / no-periods
+// entry that would corrupt the Full/Low badge and peak-occupancy math. It's just normalized
+// case-insensitively against this hotel's known room types on save, same safety net as hotel names.
+function knownRoomTypeNamesForHotel(hotelName) {
+  const hn = (hotelName || '').trim().toLowerCase();
+  const seen = new Map();
+  const add = n => { if (!n) return; const k = n.trim().toLowerCase(); if (k && !seen.has(k)) seen.set(k, n.trim()); };
+  if (hn) {
+    allotments.forEach(a => {
+      const candidates = [a.hotelName, ...((a.aliases) || [])].filter(Boolean).map(x => x.trim().toLowerCase());
+      if (candidates.includes(hn)) (a.roomTypes || []).forEach(rt => add(rt.name));
+    });
+    bookings.forEach(b => (b.hotels || []).forEach(h => {
+      if ((h.name || '').trim().toLowerCase() === hn) hotelRoomTypeLines(h).forEach(rt => add(rt.roomType));
+    }));
+  }
+  // No hotel-specific room types yet (brand-new hotel, or this hotel has no allotment on file) —
+  // fall back to the full cross-hotel list so there's still something sensible to pick from.
+  if (seen.size === 0) allotments.forEach(a => (a.roomTypes || []).forEach(rt => add(rt.name)));
+  return [...seen.values()].sort();
+}
+function roomTypeOptionsHtml(hotelName, currentName) {
+  const known = knownRoomTypeNamesForHotel(hotelName);
+  const cur = (currentName || '').trim();
+  const curInList = cur && known.some(n => n.toLowerCase() === cur.toLowerCase());
+  let opts = `<option value="">— Select room type —</option>`;
+  if (cur && !curInList) opts += `<option value="${esc(cur)}" selected>${esc(cur)} (not in list yet)</option>`;
+  opts += known.map(n => `<option value="${esc(n)}"${(curInList && n.toLowerCase() === cur.toLowerCase()) ? ' selected' : ''}>${esc(n)}</option>`).join('');
+  opts += `<option value="__new">+ Add new room type...</option>`;
+  return opts;
+}
+window.onRoomTypeSelectChange = function(sel) {
+  const line = sel.closest('.hf-rt-line');
+  const newEl = line.querySelector('.hf-rt-name-new');
+  if (sel.value === '__new') { newEl.style.display = ''; newEl.value = ''; newEl.focus(); }
+  else { newEl.style.display = 'none'; newEl.value = ''; }
+}
+// Re-scopes every room-type line's dropdown in this hotel-block to whichever hotel is currently
+// selected — called whenever the Hotel / Supplier field changes. Any text already entered (picked
+// or freshly typed) is preserved as the selected value even if it isn't in the new hotel's list.
+window.refreshRoomTypeLineOptions = function(block) {
+  const hotelName = currentHotelBlockName(block);
+  block.querySelectorAll('.hf-rt-line').forEach(line => {
+    const sel = line.querySelector('.hf-rt-select');
+    const newEl = line.querySelector('.hf-rt-name-new');
+    if (!sel) return;
+    const currentText = sel.value === '__new' ? newEl.value.trim() : sel.value;
+    sel.innerHTML = roomTypeOptionsHtml(hotelName, currentText);
+    newEl.style.display = 'none';
+    newEl.value = '';
+  });
+}
+function ensureDatalist(id) {
+  let dl = document.getElementById(id);
+  if (!dl) { dl = document.createElement('datalist'); dl.id = id; document.body.appendChild(dl); }
+  return dl;
+}
 window.refreshRoomTypeSuggestions = function() {
-  const hotelNames = [...new Set(allotments.map(a => a.hotelName).filter(Boolean))].sort();
   const roomTypeNames = [...new Set(allotments.flatMap(a => (a.roomTypes||[]).map(rt => rt.name)).filter(Boolean))].sort();
   const destinationNames = [...new Set(allotments.map(a => a.destination).filter(Boolean))].sort();
-  let hotelDL = document.getElementById('allotmentHotelNames');
-  if (!hotelDL) { hotelDL = document.createElement('datalist'); hotelDL.id = 'allotmentHotelNames'; document.body.appendChild(hotelDL); }
-  hotelDL.innerHTML = hotelNames.map(n => `<option value="${esc(n)}">`).join('');
-  let rtDL = document.getElementById('roomTypeSuggestions');
-  if (!rtDL) { rtDL = document.createElement('datalist'); rtDL.id = 'roomTypeSuggestions'; document.body.appendChild(rtDL); }
-  rtDL.innerHTML = roomTypeNames.map(n => `<option value="${esc(n)}">`).join('');
-  let destDL = document.getElementById('allotmentDestinations');
-  if (!destDL) { destDL = document.createElement('datalist'); destDL.id = 'allotmentDestinations'; document.body.appendChild(destDL); }
-  destDL.innerHTML = destinationNames.map(n => `<option value="${esc(n)}">`).join('');
+  ensureDatalist('allotmentHotelNames').innerHTML = knownHotelNames().map(n => `<option value="${esc(n)}">`).join('');
+  ensureDatalist('roomTypeSuggestions').innerHTML = roomTypeNames.map(n => `<option value="${esc(n)}">`).join('');
+  ensureDatalist('allotmentDestinations').innerHTML = destinationNames.map(n => `<option value="${esc(n)}">`).join('');
+}
+window.refreshAgentSuggestions = function() {
+  ensureDatalist('agentSuggestions').innerHTML = knownAgentNames().map(n => `<option value="${esc(n)}">`).join('');
 }
 
 window.clearAllotmentDateRange = function() {
@@ -1537,6 +1731,20 @@ window.toggleCard = function(id) {
   render();
 }
 
+// Compact change history for the expanded booking card (spec point 4: who changed what, when).
+// Newest first, capped to the last 5 entries so a long-lived booking doesn't clutter the card.
+function historyHtml(b) {
+  const hist = b.history || [];
+  if (!hist.length) return '';
+  const shown = hist.slice().reverse().slice(0, 5);
+  const more = hist.length > 5 ? `<div style="color:#aaa">+${hist.length - 5} earlier change${hist.length - 5 === 1 ? '' : 's'}</div>` : '';
+  return `<div style="padding:8px 14px;border-top:0.5px solid #eee;font-size:11px;color:#888">
+    <div style="font-weight:600;color:#666;margin-bottom:4px">History</div>
+    ${shown.map(entry => `<div style="margin-bottom:3px">${esc((entry.date||'').split('T')[0])} — <strong>${esc(entry.by||'—')}</strong>: ${esc((entry.changes||[]).join('; '))}</div>`).join('')}
+    ${more}
+  </div>`;
+}
+
 window.currentAgentFilter = '';
 window.render = function render() {
   const q = (document.getElementById('search').value || '').toLowerCase();
@@ -1670,7 +1878,7 @@ window.render = function render() {
       ${isOpen ? `<div class="card-body"><table class="hotels-table">
         <thead><tr><th>Hotel / Supplier</th><th>Check-in</th><th>Rooms</th><th>Status</th><th>Booked Via</th><th>Email sent</th><th>Reply received</th><th>Days</th><th>Deposit</th><th></th></tr></thead>
         <tbody>${hotelsHtml}</tbody>
-      </table></div>` : ''}
+      </table>${historyHtml(b)}</div>` : ''}
     </div>`;
   }).join('');
 }
@@ -1685,6 +1893,7 @@ function refreshPartnerDropdown() {
 window.openModal = function(b) {
   editId = b ? b.id : null;
   hotelCount = 0;
+  clearFieldErrors();
   document.getElementById('modal-title').textContent = b ? 'Edit booking' : 'New booking';
   document.getElementById('f-ref').value = b ? b.ref : '';
   document.getElementById('f-agent').value = b ? b.agent : currentUserName;
@@ -1723,10 +1932,13 @@ window.addHotelBlock = function(h) {
     <div class="hotel-block-title">Hotel ${idx}
       <button type="button" onclick="this.closest('.hotel-block').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
     </div>
-    <div class="field"><label>Hotel / Supplier Name</label><input class="hf-name" list="allotmentHotelNames" placeholder="e.g. Centara Koh Chang Resort" value="${esc(h?h.name:'')}"></div>
+    <div class="field"><label>Hotel / Supplier Name</label>
+      <select class="hf-hotel-select" onchange="onHotelSelectChange(this)">${hotelOptionsHtml(h ? h.name : '')}</select>
+      <input class="hf-name-new" placeholder="New hotel / supplier name" oninput="refreshRoomTypeLineOptions(this.closest('.hotel-block'))" style="margin-top:6px;${(h && h.name && !knownHotelNames().some(n=>n.toLowerCase()===h.name.toLowerCase())) ? '' : 'display:none'}" value="${(h && h.name && !knownHotelNames().some(n=>n.toLowerCase()===h.name.toLowerCase())) ? esc(h.name) : ''}">
+    </div>
     <div class="row2">
       <div class="field"><label>Check-in Date</label><input type="date" class="hf-checkin" value="${checkinVal}" oninput="onHotelCheckinChange(this)" onchange="onHotelCheckinChange(this)"></div>
-      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':checkinVal}"${checkinVal?` min="${checkinVal}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
+      <div class="field"><label>Check-out Date</label><input type="date" class="hf-checkout" value="${h?h.checkout||'':(checkinVal?addDaysToDateStr(checkinVal,1):'')}"${checkinVal?` min="${addDaysToDateStr(checkinVal,1)}"`:''} oninput="validateHotelBlockDates(this)" onchange="validateHotelBlockDates(this)"></div>
     </div>
     <div class="hf-date-warning" style="display:none;font-size:12px;margin:-6px 0 6px;font-weight:600"></div>
     <div class="field" style="margin-bottom:6px"><label>Room Types (optional, for allotment tracking — add one line per room type)</label></div>
@@ -1812,8 +2024,17 @@ window.addHotelRoomTypeLine = function(container, rt) {
   const line = document.createElement('div');
   line.className = 'hf-rt-line row2';
   line.style.cssText = 'margin-bottom:8px;align-items:flex-end';
+  const hotelBlock = container.closest('.hotel-block');
+  const hotelName = hotelBlock ? currentHotelBlockName(hotelBlock) : '';
+  const rtName = rt ? rt.roomType : '';
+  // Any pre-existing name (even one not yet in this hotel's known list) is carried as a normal
+  // selected option by roomTypeOptionsHtml itself, so the "+ Add new" text box only needs to show
+  // when the line is truly blank and the person is about to type a brand-new room type from scratch.
   line.innerHTML = `
-    <div class="field" style="margin-bottom:0"><input class="hf-rt-name" list="roomTypeSuggestions" placeholder="e.g. Deluxe" value="${esc(rt?rt.roomType:'')}"></div>
+    <div class="field" style="margin-bottom:0">
+      <select class="hf-rt-select" onchange="onRoomTypeSelectChange(this)">${roomTypeOptionsHtml(hotelName, rtName)}</select>
+      <input class="hf-rt-name-new" placeholder="New room type name" style="margin-top:6px;display:none">
+    </div>
     <div style="display:flex;gap:8px;align-items:center">
       <input type="number" min="1" class="hf-rt-rooms" placeholder="Rooms" value="${rt&&rt.rooms?rt.rooms:'1'}" style="flex:1">
       <button type="button" onclick="this.closest('.hf-rt-line').remove()" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:18px"><i class="ti ti-x"></i></button>
@@ -1829,8 +2050,9 @@ window.onHotelCheckinChange = function(el) {
   const block = el.closest('.hotel-block');
   const checkoutEl = block.querySelector('.hf-checkout');
   if (el.value) {
-    checkoutEl.min = el.value;
-    if (!checkoutEl.value) checkoutEl.value = el.value;
+    const minCheckout = addDaysToDateStr(el.value, 1);
+    checkoutEl.min = minCheckout;
+    if (!checkoutEl.value || checkoutEl.value <= el.value) checkoutEl.value = minCheckout;
   } else {
     checkoutEl.removeAttribute('min');
   }
@@ -1844,8 +2066,8 @@ window.validateHotelBlockDates = function(el) {
   if (!warnEl) return;
   const checkin = block.querySelector('.hf-checkin').value;
   const checkout = block.querySelector('.hf-checkout').value;
-  if (checkin && checkout && checkout < checkin) {
-    warnEl.textContent = '⚠️ Check-out date is before Check-in date';
+  if (checkin && checkout && checkout <= checkin) {
+    warnEl.textContent = checkout === checkin ? '⚠️ Check-out date cannot be the same day as Check-in' : '⚠️ Check-out date is before Check-in date';
     warnEl.style.color = '#c0392b';
     warnEl.style.display = '';
     return;
@@ -1862,33 +2084,159 @@ window.validateHotelBlockDates = function(el) {
   warnEl.style.display = 'none';
 }
 
+/* ---------- Field-level validation helpers ---------- */
+function clearFieldErrors() {
+  document.querySelectorAll('.field-invalid').forEach(el => el.classList.remove('field-invalid'));
+  document.querySelectorAll('.field-error-msg').forEach(el => { if (el.id !== 'modalFormError') el.remove(); });
+  const banner = document.getElementById('modalFormError');
+  banner.style.display = 'none';
+  banner.textContent = '';
+}
+function markFieldError(el, message) {
+  if (!el) return;
+  el.classList.add('field-invalid');
+  const msg = document.createElement('div');
+  msg.className = 'field-error-msg';
+  msg.textContent = message;
+  el.insertAdjacentElement('afterend', msg);
+}
+function showFormBanner(message) {
+  const banner = document.getElementById('modalFormError');
+  banner.textContent = message;
+  banner.style.display = '';
+}
+
+// Case-insensitive match against a canonical master-data list (agent names or hotel names) —
+// "Sherly" and "sherly" resolve to whichever spelling is already on file, instead of quietly
+// becoming two different agents/hotels. Returns the canonical spelling and whether it changed.
+function normalizeAgainstList(input, canonicalList) {
+  const trimmed = (input || '').trim().replace(/\s+/g, ' ');
+  if (!trimmed) return { value: trimmed, changed: false, isNew: false };
+  const match = canonicalList.find(c => c.toLowerCase() === trimmed.toLowerCase());
+  if (match) return { value: match, changed: match !== trimmed, isNew: false };
+  return { value: trimmed, changed: false, isNew: true };
+}
+
+// Same booking ref, OR same guest + a shared Check-in date on any hotel line — excluding the
+// booking currently being edited. Used to warn before saving a possible duplicate (spec point 4).
+function findDuplicateBooking(candidate) {
+  const cref = (candidate.ref || '').trim().toLowerCase();
+  const cguest = (candidate.guest || '').trim().toLowerCase();
+  const candidateCheckins = new Set((candidate.hotels || []).map(h => h.checkin).filter(Boolean));
+  return bookings.find(b => {
+    if (candidate.id && b.id === candidate.id) return false;
+    const bref = (b.ref || '').trim().toLowerCase();
+    if (bref && cref && bref === cref) return true;
+    const bguest = (b.guest || '').trim().toLowerCase();
+    if (bguest && cguest && bguest === cguest) {
+      const bCheckins = (b.hotels || []).map(h => h.checkin).filter(Boolean);
+      if (bCheckins.some(d => candidateCheckins.has(d))) return true;
+    }
+    return false;
+  });
+}
+function confirmDuplicate(dup) {
+  return new Promise(resolve => {
+    duplicateOverrideContext = { resolve };
+    const hotelSummary = (dup.hotels || []).map(h => `${h.name || '—'} (${h.checkin || '—'})`).join(', ') || '—';
+    document.getElementById('duplicateInfo').innerHTML = `
+      This looks like it might already exist:<br><br>
+      <strong>${esc(dup.ref)}</strong> — ${esc(dup.guest)} · Agent: ${esc(dup.agent)}<br>
+      ${esc(hotelSummary)}<br><br>
+      ${isAdminViewer()
+        ? 'If this is genuinely a separate, different booking, you can save it anyway.'
+        : 'If this is genuinely a separate, different booking, please ask an admin to confirm and save it — or double-check the booking reference, guest name, and check-in date.'}
+    `;
+    document.getElementById('duplicateOverrideBtn').style.display = isAdminViewer() ? '' : 'none';
+    document.getElementById('duplicateModal').classList.add('open');
+  });
+}
+window.resolveDuplicateModal = function(result) {
+  document.getElementById('duplicateModal').classList.remove('open');
+  if (duplicateOverrideContext) { duplicateOverrideContext.resolve(result); duplicateOverrideContext = null; }
+}
+
+// Compact, human-readable change log for the booking's history trail (spec point 4: "who changed
+// what and when"). Covers the fields that actually matter day-to-day — not a full field-by-field
+// diff of every internal property.
+function diffBookingChanges(before, after) {
+  const changes = [];
+  if (!before) { changes.push('Booking created'); return changes; }
+  const fieldLabel = { ref: 'Ref', guest: 'Guest', agent: 'Agent', partnerName: 'Partner', pax: 'Pax', booking_type: 'Booking type' };
+  Object.keys(fieldLabel).forEach(f => {
+    const a = (before[f] ?? '').toString(); const b = (after[f] ?? '').toString();
+    if (a !== b) changes.push(`${fieldLabel[f]}: "${a || '—'}" → "${b || '—'}"`);
+  });
+  const beforeHotels = new Map((before.hotels || []).map(h => [h.id, h]));
+  const afterHotels = new Map((after.hotels || []).map(h => [h.id, h]));
+  afterHotels.forEach((h, id) => {
+    if (!beforeHotels.has(id)) { changes.push(`Hotel added: ${h.name || '—'}`); return; }
+    const bh = beforeHotels.get(id);
+    ['name', 'checkin', 'checkout', 'status'].forEach(f => {
+      if ((bh[f] || '') !== (h[f] || '')) changes.push(`${h.name || 'Hotel'}: ${f} "${bh[f] || '—'}" → "${h[f] || '—'}"`);
+    });
+    const bDep = bh.deposit || {}, aDep = h.deposit || {};
+    if (!!bDep.required !== !!aDep.required || !!bDep.paid !== !!aDep.paid) {
+      changes.push(`${h.name || 'Hotel'}: deposit ${aDep.required ? (aDep.paid ? 'confirmed paid' : 'required, not yet paid') : 'not required'}`);
+    }
+    const bCc = bh.creditcard || {}, aCc = h.creditcard || {};
+    if (!!bCc.required !== !!aCc.required || !!bCc.paid !== !!aCc.paid) {
+      changes.push(`${h.name || 'Hotel'}: credit card ${aCc.required ? (aCc.paid ? 'confirmed paid' : 'required, not yet paid') : 'not required'}`);
+    }
+  });
+  beforeHotels.forEach((h, id) => { if (!afterHotels.has(id)) changes.push(`Hotel removed: ${h.name || '—'}`); });
+  return changes;
+}
+
 window.saveBooking = async function() {
-  const ref = document.getElementById('f-ref').value.trim();
-  const agent = document.getElementById('f-agent').value.trim();
-  const guest = document.getElementById('f-guest').value.trim();
-  const pax = parseInt(document.getElementById('f-pax').value) || 0;
-  const partnerId = document.getElementById('f-partner').value;
+  clearFieldErrors();
+  const refEl = document.getElementById('f-ref'), agentEl = document.getElementById('f-agent'),
+        guestEl = document.getElementById('f-guest'), paxEl = document.getElementById('f-pax'),
+        partnerEl = document.getElementById('f-partner');
+  const ref = refEl.value.trim();
+  const agentRaw = agentEl.value.trim();
+  const guest = guestEl.value.trim();
+  const pax = parseInt(paxEl.value) || 0;
+  const partnerId = partnerEl.value;
   const partnerName = partnerId ? (partners.find(p=>p.id===partnerId)||{}).name || '' : '';
-  if (!ref || !agent) { alert('Please fill in Booking ref. and Your name.'); return; }
-  if (!pax) { alert('Please fill in No. of Pax.'); return; }
+
+  let hasError = false;
+  if (!ref) { markFieldError(refEl, 'Booking reference is required.'); hasError = true; }
+  if (!guest) { markFieldError(guestEl, 'Guest / group name is required.'); hasError = true; }
+  if (!agentRaw) { markFieldError(agentEl, 'Responsible agent is required.'); hasError = true; }
+  if (!partnerId) { markFieldError(partnerEl, 'Please select a partner.'); hasError = true; }
+  if (!pax) { markFieldError(paxEl, 'Number of pax is required.'); hasError = true; }
 
   const hotels = [];
   document.querySelectorAll('.hotel-block').forEach(block => {
-    const name = block.querySelector('.hf-name').value.trim();
-    if (!name) return;
+    const selectEl = block.querySelector('.hf-hotel-select'), newNameEl = block.querySelector('.hf-name-new'), checkinEl = block.querySelector('.hf-checkin');
+    const pickingNew = selectEl.value === '__new';
+    const name = pickingNew ? newNameEl.value.trim() : selectEl.value.trim();
+    const checkin = checkinEl.value;
+    const roomTypeFilled = [...block.querySelectorAll('.hf-rt-line')].some(line => {
+      const s = line.querySelector('.hf-rt-select'), n = line.querySelector('.hf-rt-name-new');
+      return (s.value === '__new' ? n.value : s.value).trim();
+    });
+    const hasAnyData = !!name || !!selectEl.value || !!checkin || roomTypeFilled;
+    if (!hasAnyData) return; // an untouched extra block — not a real line, drop silently as before
+
+    if (!name) { markFieldError(pickingNew ? newNameEl : selectEl, 'Hotel / supplier name is required.'); hasError = true; }
+    if (!checkin) { markFieldError(checkinEl, 'Check-in date is required.'); hasError = true; }
+
     const depReq = block.querySelector('.hf-dep-req').checked;
     const ccReq = block.querySelector('.hf-cc-req').checked;
     const roomTypes = [];
     block.querySelectorAll('.hf-roomtypes .hf-rt-line').forEach(line => {
-      const roomType = line.querySelector('.hf-rt-name').value.trim();
+      const rtSelectEl = line.querySelector('.hf-rt-select'), rtNewEl = line.querySelector('.hf-rt-name-new');
+      const roomType = (rtSelectEl.value === '__new' ? rtNewEl.value : rtSelectEl.value).trim();
       const rooms = parseInt(line.querySelector('.hf-rt-rooms').value) || 1;
       roomTypes.push({ roomType, rooms });
     });
     if (roomTypes.length === 0) roomTypes.push({ roomType: '', rooms: 1 }); // every line was removed — keep at least one so "rooms" still saves
     hotels.push({
-      id: block.dataset.hid, name,
+      id: block.dataset.hid, name, _pickedNew: pickingNew,
       roomTypes,
-      checkin: block.querySelector('.hf-checkin').value,
+      checkin,
       checkout: block.querySelector('.hf-checkout').value,
       status: block.querySelector('.hf-status').value,
       sent: block.querySelector('.hf-sent').value,
@@ -1911,10 +2259,16 @@ window.saveBooking = async function() {
       depositNote: block.querySelector('.hf-dep-note').value.trim()
     });
   });
-  if (hotels.length === 0) { alert('Please add at least one hotel.'); return; }
+  if (hotels.length === 0 && !hasError) { showFormBanner('Please add at least one hotel / supplier line.'); hasError = true; }
 
-  const badDates = hotels.find(h => h.checkin && h.checkout && h.checkout < h.checkin);
-  if (badDates) { alert(`Check-out date is before Check-in date for "${badDates.name}". Please fix the dates before saving.`); return; }
+  const badDates = hotels.find(h => h.checkin && h.checkout && h.checkout <= h.checkin);
+  if (badDates) {
+    const block = [...document.querySelectorAll('.hotel-block')].find(b => b.dataset.hid === badDates.id);
+    if (block) markFieldError(block.querySelector('.hf-checkout'), 'Check-out must be after Check-in (not the same day or earlier).');
+    hasError = true;
+  }
+
+  if (hasError) { showFormBanner('Please fix the highlighted fields before saving.'); return; }
 
   const longStay = hotels.find(h => h.checkin && h.checkout && (daysBetween(h.checkin, h.checkout) || 0) > 14);
   if (longStay) {
@@ -1923,11 +2277,60 @@ window.saveBooking = async function() {
     if (!ok) return;
   }
 
+  // Standardize/clean: trim + match existing spelling case-insensitively, so "Sherly" and
+  // "sherly", or "Rawi Warin Resort" and "rawi warin resort", don't become separate records.
+  const notices = [];
+  const agentNorm = normalizeAgainstList(agentRaw, knownAgentNames());
+  if (agentNorm.changed) notices.push(`Matched agent to existing: ${agentNorm.value}`);
+  const agent = agentNorm.value;
+  const knownHotels = knownHotelNames();
+  const newHotelNames = [];
+  hotels.forEach(h => {
+    const hn = normalizeAgainstList(h.name, knownHotels);
+    if (hn.changed) notices.push(`Matched hotel to existing: ${hn.value}`);
+    h.name = hn.value;
+    if (h._pickedNew && hn.isNew) newHotelNames.push(hn.value);
+    delete h._pickedNew;
+  });
+  // Room type: same case-insensitive safety net, scoped to each hotel's own known room types —
+  // but (unlike hotels) a genuinely new room type is never auto-saved anywhere here, since it has
+  // no independent master record and writing into an allotment's roomTypes array is riskier.
+  hotels.forEach(h => {
+    const knownRt = knownRoomTypeNamesForHotel(h.name);
+    h.roomTypes.forEach(rt => {
+      if (!rt.roomType) return;
+      const rn = normalizeAgainstList(rt.roomType, knownRt);
+      if (rn.changed) notices.push(`Matched room type to existing: ${rn.value}`);
+      rt.roomType = rn.value;
+    });
+  });
+
   const existing = editId ? bookings.find(b=>b.id===editId) : null;
   const bookingType = document.getElementById('f-booking-type').value;
   const booking = { id: editId || ('b_' + Date.now()), ref, agent, guest, pax, hotels, partnerId, partnerName, booking_type: bookingType, archived: existing ? !!existing.archived : false };
+
+  // Possible duplicate: same ref, or same guest + a shared check-in date. Never silent — always
+  // shown before saving. Only an admin (My Action List's "admin" role) can save through it.
+  const dup = findDuplicateBooking(booking);
+  if (dup) {
+    const proceed = await confirmDuplicate(dup);
+    if (!proceed) return;
+  }
+
+  // Change history: who changed what, when — appended, never rewritten.
+  const changes = diffBookingChanges(existing, booking);
+  booking.history = (existing && existing.history) ? existing.history.slice() : [];
+  if (changes.length) booking.history.push({ by: currentUserName, date: new Date().toISOString(), changes });
+
   await setDoc(doc(db, 'bookings', booking.id), booking);
+  // New hotels picked via "+ Add new hotel..." join the Hotels master list (CRM tab), so they're
+  // a real selectable option — not free text — on every future booking too.
+  for (const name of newHotelNames) {
+    await setDoc(doc(db, 'hotelsCrm', 'h_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7)), { name, contact: '', emailphone: '', info: '', notes: [] });
+  }
   window.closeModal('modal');
+  if (newHotelNames.length) notices.push(`Added to Hotels list: ${newHotelNames.join(', ')}`);
+  if (notices.length) showToast(`✅ Saved — ${notices.join('; ')}`);
 }
 
 window.editBooking = function(id) { const b = bookings.find(x => x.id === id); if (b) { expandedCards.add(id); window.openModal(b); } }
