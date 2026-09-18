@@ -62,6 +62,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .b-confirmed{background:#e8f5e9;color:#2d6e2d}
 .b-cancelled{background:#f0f0ee;color:#666}
 .b-archived{background:#eee;color:#888}
+.b-neutral{background:#f0f0ee;color:#666}
+.b-red{background:#fce8e8;color:#a32d2d}
+.b-amber{background:#fef3e2;color:#7a4a00}
 .dep-badge{font-size:11px;padding:2px 7px;border-radius:20px;white-space:nowrap}
 .dep-required{background:#fef3e2;color:#7a4a00}
 .dep-paid{background:#e8f5e9;color:#2d6e2d}
@@ -73,6 +76,28 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .empty{text-align:center;padding:3rem;color:#999;font-size:13px}
 .chevron{transition:transform 0.2s;font-size:18px;color:#ccc}
 .chevron.open{transform:rotate(180deg)}
+
+/* Action List */
+.action-section{margin-bottom:1.5rem}
+.action-section-title{font-size:13px;font-weight:600;color:#555;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.action-section-count{font-size:12px;font-weight:500;color:#999}
+.action-row{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;border-left:3px solid #ddd;padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.action-row.sev-red{border-left-color:#c0392b;background:#fffaf9}
+.action-row.sev-amber{border-left-color:#c98a1f;background:#fffdf8}
+.action-row.sev-neutral{border-left-color:#ccc}
+.action-row-main{font-size:13px}
+.action-row-title{font-weight:600}
+.action-row-sub{color:#888;font-size:12px;margin-top:2px}
+.action-row-waited{font-size:12px;margin-top:2px}
+.action-row-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.action-empty{background:#fff;border-radius:10px;border:0.5px solid #e0e0dc;padding:30px;text-align:center;color:#888;font-size:14px}
+.action-view-toggle{font-size:12px;color:#666;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.action-small-btn{font-size:12px;padding:5px 10px;border-radius:6px;border:0.5px solid #ccc;background:#fff;cursor:pointer;color:#333}
+.action-small-btn.primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.team-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:0.5px solid #e8e8e4;border-radius:8px;margin-bottom:6px;font-size:13px}
+.team-row-main{display:flex;flex-direction:column}
+.team-row-sub{font-size:11px;color:#888}
+.action-agent-tag{font-size:11px;background:#f0f0ee;padding:2px 8px;border-radius:20px;color:#666}
 
 /* Modal */
 .modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:200;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
@@ -161,20 +186,30 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
     <div>
       <div style="font-size:20px;font-weight:600">AET Booking Tracker</div>
-      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="doLogout()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(sign out)</button> &nbsp;·&nbsp; <span id="onlineCount" title="" style="color:#888"></span></div>
+      <div style="font-size:13px;color:#666;margin-top:2px">Asia Evolution Tour — booking@evolutiontour.com &nbsp;·&nbsp; <span id="currentUserLabel" style="color:#1a7a55;font-weight:500"></span> <button onclick="doLogout()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(sign out)</button> &nbsp;·&nbsp; <button onclick="openTeamModal()" style="background:none;border:none;color:#aaa;cursor:pointer;font-size:12px">(team)</button> &nbsp;·&nbsp; <span id="onlineCount" title="" style="color:#888"></span></div>
     </div>
   </div>
 
   <div class="top-tabs">
-    <div class="top-tab active" data-tab="bookings" onclick="switchTab('bookings')"><i class="ti ti-calendar-event"></i> Bookings</div>
+    <div class="top-tab active" data-tab="action" onclick="switchTab('action')"><i class="ti ti-list-check"></i> My Action List</div>
+    <div class="top-tab" data-tab="bookings" onclick="switchTab('bookings')"><i class="ti ti-calendar-event"></i> Bookings</div>
     <div class="top-tab" data-tab="stats" onclick="switchTab('stats-tab')"><i class="ti ti-chart-bar"></i> Response Stats</div>
     <div class="top-tab" data-tab="crm" onclick="switchTab('crm')"><i class="ti ti-users"></i> Partners &amp; Hotels</div>
     <div class="top-tab" data-tab="sop" onclick="switchTab('sop')"><i class="ti ti-book"></i> Playbook / SOPs</div>
     <div class="top-tab" data-tab="allotments" onclick="switchTab('allotments')"><i class="ti ti-bed"></i> Allotments</div>
   </div>
 
+  <!-- MY ACTION LIST TAB -->
+  <div class="tab-panel active" id="panel-action">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
+      <div id="actionSummary" style="font-size:14px;color:#555"></div>
+      <div id="actionViewToggle"></div>
+    </div>
+    <div id="actionListWrap"></div>
+  </div>
+
   <!-- BOOKINGS TAB -->
-  <div class="tab-panel active" id="panel-bookings">
+  <div class="tab-panel" id="panel-bookings">
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-bottom:1rem">
       <button class="btn" onclick="exportCSV()"><i class="ti ti-download"></i> Export CSV</button>
       <button class="btn primary" onclick="openModal()"><i class="ti ti-plus"></i> New booking</button>
@@ -378,6 +413,54 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 </div>
 </div>
 
+<!-- Escalate Modal -->
+<div class="modal-bg" id="escalateModal" onclick="bgClose(event,'escalateModal')">
+<div class="modal">
+  <h2>Escalate</h2>
+  <div id="escalateContext" style="font-size:13px;color:#666;margin-bottom:14px"></div>
+  <div class="field"><label>New responsible agent</label>
+    <input id="escalate-agent" list="escalateAgentSuggestions" placeholder="e.g. Somchai">
+    <datalist id="escalateAgentSuggestions"></datalist>
+  </div>
+  <div class="field"><label>Note (optional)</label><textarea id="escalate-note" placeholder="e.g. I'm out of office, please take over this one" style="min-height:80px"></textarea></div>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('escalateModal')">Cancel</button>
+    <button class="btn primary" onclick="saveEscalation()">Escalate</button>
+  </div>
+</div>
+</div>
+
+<!-- Team / agent mapping Modal -->
+<div class="modal-bg" id="teamModal" onclick="bgClose(event,'teamModal')">
+<div class="modal wide">
+  <h2>Team — login to agent name mapping</h2>
+  <p style="font-size:12px;color:#888;margin:-8px 0 14px">
+    Maps a login email to the agent name used on bookings, so "My Action List" knows which tasks belong to which logged-in account.
+    Role "admin" can also see everyone's action list, not just their own.
+  </p>
+  <div id="teamList" style="margin-bottom:1rem"></div>
+  <div class="section-divider">Add / update</div>
+  <div class="row2">
+    <div class="field"><label>Login email</label><input id="team-email" placeholder="e.g. kcasiaevolutiontour@gmail.com"></div>
+    <div class="field"><label>Display name</label><input id="team-displayname" placeholder="e.g. Koh Chang"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label>Agent name (as used on bookings)</label><input id="team-agentname" placeholder="e.g. Somchai"></div>
+    <div class="field"><label>Role</label>
+      <select id="team-role">
+        <option value="staff">staff</option>
+        <option value="admin">admin (sees everyone's action list)</option>
+      </select>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn" onclick="loadDefaultTeam()" title="Fills in the 15 AET accounts with their real names">Load default team</button>
+    <button class="btn" onclick="closeModal('teamModal')">Close</button>
+    <button class="btn primary" onclick="saveTeamMember()">Save mapping</button>
+  </div>
+</div>
+</div>
+
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot, doc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -400,21 +483,26 @@ const auth = getAuth(app);
 // email. The email itself (from Firebase Auth) stays the authoritative identity.
 const USER_DISPLAY_NAMES = {
   'brian.harry.boysen@gmail.com': 'Harry',
-  'tumma.supha@gmail.com': 'Supha',
-  'rsvnasiaevolutiontour@gmail.com': 'Reservations',
-  'tourevolution@gmail.com': 'Tour Evolution',
-  'salesasiaevolutiontour@gmail.com': 'Sales',
-  'sales02asiaevolutiontour@gmail.com': 'Sales 2',
-  'sales03asiaevolutiontour@gmail.com': 'Sales 3',
-  'sales04asiaevolutiontour@gmail.com': 'Sales 4',
-  'sales05asiaevolutiontour@gmail.com': 'Sales 5',
-  'kcasiaevolutiontour@gmail.com': 'Koh Chang',
-  'asiaevolutionlanta@gmail.com': 'Koh Lanta',
-  'ac.evolutiontour@gmail.com': 'Accounting',
-  'asiaevolutiontourservices@gmail.com': 'Services',
-  'aetchiangmai@gmail.com': 'Chiang Mai',
-  'bkkasiaevolutiontour@gmail.com': 'Bangkok'
+  'tumma.supha@gmail.com': 'Kai',
+  'rsvnasiaevolutiontour@gmail.com': 'New',
+  'tourevolution@gmail.com': 'Natty',
+  'salesasiaevolutiontour@gmail.com': 'Sherly',
+  'sales02asiaevolutiontour@gmail.com': 'Benz',
+  'sales03asiaevolutiontour@gmail.com': 'Waan',
+  'sales04asiaevolutiontour@gmail.com': 'Mi',
+  'sales05asiaevolutiontour@gmail.com': 'Hem',
+  'kcasiaevolutiontour@gmail.com': 'Nipon',
+  'asiaevolutionlanta@gmail.com': 'Bee',
+  'ac.evolutiontour@gmail.com': 'Air',
+  'asiaevolutiontourservices@gmail.com': 'Jonas',
+  'aetchiangmai@gmail.com': 'Winnie',
+  'bkkasiaevolutiontour@gmail.com': 'Neung'
 };
+// ADMIN_ROLE_EMAILS: narrow scope, only controls the "view everyone's tasks" toggle
+// on My Action List (see requirement 8's "admin sees combined view"). This is NOT the
+// old delete-permission admin tier — that was removed 2026-09-18 per Harry's decision
+// and must stay removed. Everyone can still see/create/update/delete everything.
+const ADMIN_ROLE_EMAILS = ['brian.harry.boysen@gmail.com'];
 function displayNameFor(email) { return (email && USER_DISPLAY_NAMES[email]) || email || ''; }
 
 let bookings = [];
@@ -424,6 +512,9 @@ let sops = [];
 let trips = [];
 let allotments = [];
 let dismissedDuplicates = [];
+let users = []; // Firestore 'users' collection: {id, email, displayName, agentName, role}
+let actionViewAll = false; // when true (admin only), My Action List shows everyone's tasks
+let escalateContext = null; // {bookingId, hotelId} while the Escalate modal is open
 
 let editId = null;
 let currentFilter = 'all';
@@ -509,6 +600,12 @@ function startApp() {
     render();
     renderStats();
     renderAllotments();
+    renderActionList();
+  });
+  onSnapshot(collection(db, 'users'), (snap) => {
+    users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderActionList();
+    renderTeamList();
   });
   onSnapshot(collection(db, 'allotments'), (snap) => {
     allotments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -608,6 +705,7 @@ window.switchTab = function(tab) {
   if (tab === 'sop') renderSops();
   if (tab === 'stats-tab') renderStats();
   if (tab === 'allotments') renderAllotments();
+  if (tab === 'action') renderActionList();
 }
 
 /* ---------- Helpers ---------- */
@@ -618,6 +716,265 @@ function bookingHasAlert(b) { return (b.hotels||[]).some(hotelNeedsFollowup); }
 function bookingHasDepositPending(b) { return (b.hotels||[]).some(h => h.deposit && h.deposit.required && !h.deposit.paid); }
 function bookingHasCreditCardPending(b) { return (b.hotels||[]).some(h => h.creditcard && h.creditcard.required && !h.creditcard.paid); }
 function esc(s) { return (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+/* ================= My Action List ================= */
+// Uses the same status/sent/reply/deposit/creditcard fields as the Bookings tab —
+// no new data required for follow-up or payment tracking. New fields, additive only:
+// h.assignedAgent (who currently owns this hotel line, set by Escalate), h.escalations[]
+// (history trail), and the 'users' Firestore collection (login email -> agent name/role).
+function teamMemberForEmail(email) {
+  const e = (email || '').toLowerCase();
+  return users.find(u => (u.email || '').toLowerCase() === e);
+}
+function myAgentName() {
+  const u = teamMemberForEmail(currentUserEmail);
+  return ((u && u.agentName) || currentUserName || '').trim();
+}
+function isAdminViewer() {
+  const u = teamMemberForEmail(currentUserEmail);
+  if (u && u.role) return u.role === 'admin';
+  return ADMIN_ROLE_EMAILS.includes((currentUserEmail || '').toLowerCase());
+}
+function hotelResponsibleAgent(b, h) {
+  return ((h.assignedAgent || b.agent) || '').trim();
+}
+const SEV_RANK = { red: 0, amber: 1, neutral: 2 };
+
+function actionListRows(viewingAll) {
+  const mine = myAgentName().toLowerCase();
+  const out = { followup: [], payment: [], pending: [] };
+  bookings.filter(b => !b.archived).forEach(b => {
+    (b.hotels || []).forEach(h => {
+      const responsible = hotelResponsibleAgent(b, h);
+      if (!viewingAll) {
+        if (!mine || !responsible || responsible.toLowerCase() !== mine) return;
+      }
+      const base = { b, h, responsible };
+
+      if (hotelNeedsFollowup(h)) {
+        const days = daysSince(h.sent);
+        const severity = days > 2 ? 'red' : 'amber';
+        out.followup.push({ ...base, category: 'followup', severity,
+          missing: severity === 'red' ? 'Follow-up overdue' : 'Follow-up due today',
+          waitedLabel: `Waiting ${days}d for reply`, sortDays: days });
+      } else if (h.status === 'pending' && h.sent && !h.reply) {
+        const days = daysSince(h.sent);
+        out.pending.push({ ...base, category: 'pending', severity: 'neutral',
+          missing: 'Awaiting supplier reply', waitedLabel: `Waiting ${days}d for reply`, sortDays: days });
+      }
+
+      const depPending = !!(h.deposit && h.deposit.required && !h.deposit.paid);
+      const ccPending = !!(h.creditcard && h.creditcard.required && !h.creditcard.paid);
+      if (depPending || ccPending) {
+        const missingParts = [];
+        if (depPending) missingParts.push('Deposit pending');
+        if (ccPending) missingParts.push('Credit card required');
+        const daysToCheckin = h.checkin ? daysBetween(new Date().toISOString().split('T')[0], h.checkin) : null;
+        let severity = 'neutral';
+        if (daysToCheckin !== null && daysToCheckin <= 3) severity = 'red';
+        else {
+          const informedOk = (!depPending || h.deposit.informed) && (!ccPending || h.creditcard.informed);
+          if (!informedOk) severity = 'amber';
+        }
+        const waitedLabel = daysToCheckin === null ? 'No check-in date set'
+          : daysToCheckin < 0 ? `Check-in was ${Math.abs(daysToCheckin)}d ago`
+          : `Check-in in ${daysToCheckin}d`;
+        out.payment.push({ ...base, category: 'payment', severity,
+          missing: missingParts.join(' + '), waitedLabel,
+          sortDays: daysToCheckin === null ? -999999 : -daysToCheckin });
+      }
+    });
+  });
+  [out.followup, out.payment, out.pending].forEach(list =>
+    list.sort((a, b2) => (SEV_RANK[a.severity] - SEV_RANK[b2.severity]) || (b2.sortDays - a.sortDays))
+  );
+  return out;
+}
+
+function actionRowHtml(r, viewingAll) {
+  const agentTag = viewingAll ? `<span class="action-agent-tag">${esc(r.responsible || '—')}</span>` : '';
+  const followActions = (r.category === 'followup' || r.category === 'pending')
+    ? `<button class="action-small-btn" title="Copy follow-up email (draft only, does not send)" onclick="copyFollowup('${r.b.id}','${r.h.id}',event)"><i class="ti ti-mail"></i> Send follow-up</button>
+       <button class="action-small-btn" title="Mark reply received" onclick="markHotelReplied('${r.b.id}','${r.h.id}',event)"><i class="ti ti-check"></i> Mark reply received</button>`
+    : '';
+  return `<div class="action-row sev-${r.severity}">
+    <div class="action-row-main">
+      <div class="action-row-title">${esc(r.b.ref)} — ${esc(r.b.guest)}</div>
+      <div class="action-row-sub">${esc(r.h.name)} · Check-in ${r.h.checkin || '—'}</div>
+      <div class="action-row-waited">${esc(r.waitedLabel)}</div>
+      <div style="margin-top:4px"><span class="badge b-${r.severity}">${esc(r.missing)}</span> ${agentTag}</div>
+    </div>
+    <div class="action-row-actions">
+      ${followActions}
+      <button class="action-small-btn" title="Escalate to someone else" onclick="openEscalateModal('${r.b.id}','${r.h.id}',event)"><i class="ti ti-corner-up-right"></i> Escalate</button>
+    </div>
+  </div>`;
+}
+
+function actionSectionHtml(title, list, viewingAll) {
+  if (!list.length) return '';
+  return `<div class="action-section">
+    <div class="action-section-title">${esc(title)} <span class="action-section-count">(${list.length})</span></div>
+    ${list.map(r => actionRowHtml(r, viewingAll)).join('')}
+  </div>`;
+}
+
+window.setActionViewAll = function(v) { actionViewAll = v; renderActionList(); }
+
+function renderActionList() {
+  const wrapEl = document.getElementById('actionListWrap');
+  const summaryEl = document.getElementById('actionSummary');
+  const toggleEl = document.getElementById('actionViewToggle');
+  if (!wrapEl || !summaryEl || !toggleEl) return;
+
+  const admin = isAdminViewer();
+  const viewingAll = admin && actionViewAll;
+  toggleEl.innerHTML = admin
+    ? `<label class="action-view-toggle"><input type="checkbox" ${viewingAll ? 'checked' : ''} onchange="setActionViewAll(this.checked)"> Show everyone's tasks</label>`
+    : '';
+
+  const rows = actionListRows(viewingAll);
+  const overdue = rows.followup.filter(r => r.severity === 'red').length;
+  const dueToday = rows.followup.filter(r => r.severity === 'amber').length;
+  const paymentIssues = rows.payment.length;
+  const awaitingReply = rows.pending.length;
+  const total = rows.followup.length + rows.payment.length + rows.pending.length;
+
+  summaryEl.innerHTML = total === 0
+    ? `<strong style="color:#2d6e2d">✓ No actions needed today</strong>`
+    : `${overdue} overdue · ${dueToday} due today · ${paymentIssues} payment issues${awaitingReply ? ` · ${awaitingReply} awaiting reply` : ''}`;
+
+  if (total === 0) {
+    wrapEl.innerHTML = `<div class="action-empty"><i class="ti ti-circle-check" style="font-size:28px;display:block;margin-bottom:8px;color:#2d6e2d"></i>No actions needed today</div>`;
+    return;
+  }
+
+  wrapEl.innerHTML =
+    actionSectionHtml('Follow-up due today / overdue', rows.followup, viewingAll) +
+    actionSectionHtml('Payment required', rows.payment, viewingAll) +
+    actionSectionHtml('Supplier reply pending', rows.pending, viewingAll);
+}
+
+/* ---------- Escalate modal ---------- */
+window.openEscalateModal = function(bookingId, hotelId, e) {
+  if (e) e.stopPropagation();
+  escalateContext = { bookingId, hotelId };
+  const b = bookings.find(x => x.id === bookingId);
+  const h = b && (b.hotels || []).find(x => x.id === hotelId);
+  document.getElementById('escalateContext').textContent = (b && h) ? `${b.ref} — ${b.guest} · ${h.name}` : '';
+  document.getElementById('escalate-agent').value = '';
+  document.getElementById('escalate-note').value = '';
+  const names = users.length ? users.map(u => u.agentName).filter(Boolean) : Object.values(USER_DISPLAY_NAMES);
+  document.getElementById('escalateAgentSuggestions').innerHTML = [...new Set(names)].map(n => `<option value="${esc(n)}">`).join('');
+  document.getElementById('escalateModal').classList.add('open');
+}
+
+window.saveEscalation = async function() {
+  if (!escalateContext) return;
+  const newAgent = document.getElementById('escalate-agent').value.trim();
+  if (!newAgent) { alert('Please choose or enter a responsible agent.'); return; }
+  const note = document.getElementById('escalate-note').value.trim();
+  const { bookingId, hotelId } = escalateContext;
+  const b = bookings.find(x => x.id === bookingId); if (!b) return;
+  const h = (b.hotels || []).find(x => x.id === hotelId); if (!h) return;
+  const fromAgent = hotelResponsibleAgent(b, h) || myAgentName() || currentUserName;
+  h.escalations = h.escalations || [];
+  h.escalations.push({ to: newAgent, from: fromAgent, date: new Date().toISOString(), note });
+  h.assignedAgent = newAgent;
+  await setDoc(doc(db, 'bookings', b.id), b);
+  window.closeModal('escalateModal');
+  escalateContext = null;
+  showToast(`✅ Escalated to ${newAgent}`);
+}
+
+/* ---------- Team modal (users collection: login email -> agent name / role) ---------- */
+let teamEditId = null;
+
+function renderTeamList() {
+  const el = document.getElementById('teamList');
+  if (!el) return;
+  if (!users.length) {
+    el.innerHTML = `<div style="font-size:12px;color:#888">No team mapping yet — click "Load default team" below, or add people one by one.</div>`;
+    return;
+  }
+  el.innerHTML = users.slice().sort((a, b) => (a.displayName || '').localeCompare(b.displayName || '')).map(u => `
+    <div class="team-row">
+      <div class="team-row-main">
+        <div><strong>${esc(u.displayName || u.agentName || u.email)}</strong> ${u.role === 'admin' ? '<span class="badge b-confirmed">admin</span>' : ''}</div>
+        <div class="team-row-sub">${esc(u.email)} · agent name on bookings: ${esc(u.agentName || '—')}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="icon-btn" title="Edit" onclick="editTeamMember('${u.id}')"><i class="ti ti-edit"></i></button>
+        <button class="icon-btn" title="Delete" onclick="deleteTeamMember('${u.id}')" style="color:#a32d2d"><i class="ti ti-trash"></i></button>
+      </div>
+    </div>`).join('');
+}
+
+window.openTeamModal = function() {
+  teamEditId = null;
+  document.getElementById('team-email').value = '';
+  document.getElementById('team-displayname').value = '';
+  document.getElementById('team-agentname').value = '';
+  document.getElementById('team-role').value = 'staff';
+  renderTeamList();
+  document.getElementById('teamModal').classList.add('open');
+}
+
+window.editTeamMember = function(id) {
+  const u = users.find(x => x.id === id); if (!u) return;
+  teamEditId = id;
+  document.getElementById('team-email').value = u.email || '';
+  document.getElementById('team-displayname').value = u.displayName || '';
+  document.getElementById('team-agentname').value = u.agentName || '';
+  document.getElementById('team-role').value = u.role || 'staff';
+}
+
+window.deleteTeamMember = async function(id) {
+  if (!confirm('Remove this team mapping?')) return;
+  await deleteDoc(doc(db, 'users', id));
+  if (teamEditId === id) teamEditId = null;
+}
+
+window.saveTeamMember = async function() {
+  const email = document.getElementById('team-email').value.trim().toLowerCase();
+  if (!email) { alert('Login email is required.'); return; }
+  const displayName = document.getElementById('team-displayname').value.trim();
+  const agentName = document.getElementById('team-agentname').value.trim();
+  const role = document.getElementById('team-role').value;
+  const id = teamEditId || email;
+  await setDoc(doc(db, 'users', id), { email, displayName, agentName, role });
+  teamEditId = null;
+  document.getElementById('team-email').value = '';
+  document.getElementById('team-displayname').value = '';
+  document.getElementById('team-agentname').value = '';
+  document.getElementById('team-role').value = 'staff';
+  showToast('✅ Team mapping saved');
+}
+
+window.loadDefaultTeam = async function() {
+  if (!confirm("Add/update the 15 AET accounts with their real names?")) return;
+  const defaults = [
+    ['brian.harry.boysen@gmail.com', 'Harry', 'Harry', 'admin'],
+    ['tumma.supha@gmail.com', 'Kai', 'Kai', 'staff'],
+    ['rsvnasiaevolutiontour@gmail.com', 'New', 'New', 'staff'],
+    ['tourevolution@gmail.com', 'Natty', 'Natty', 'staff'],
+    ['salesasiaevolutiontour@gmail.com', 'Sherly', 'Sherly', 'staff'],
+    ['sales02asiaevolutiontour@gmail.com', 'Benz', 'Benz', 'staff'],
+    ['sales03asiaevolutiontour@gmail.com', 'Waan', 'Waan', 'staff'],
+    ['sales04asiaevolutiontour@gmail.com', 'Mi', 'Mi', 'staff'],
+    ['sales05asiaevolutiontour@gmail.com', 'Hem', 'Hem', 'staff'],
+    ['kcasiaevolutiontour@gmail.com', 'Nipon', 'Nipon', 'staff'],
+    ['asiaevolutionlanta@gmail.com', 'Bee', 'Bee', 'staff'],
+    ['ac.evolutiontour@gmail.com', 'Air', 'Air', 'staff'],
+    ['asiaevolutiontourservices@gmail.com', 'Jonas', 'Jonas', 'staff'],
+    ['aetchiangmai@gmail.com', 'Winnie', 'Winnie', 'staff'],
+    ['bkkasiaevolutiontour@gmail.com', 'Neung', 'Neung', 'staff']
+  ];
+  for (const [email, displayName, agentName, role] of defaults) {
+    await setDoc(doc(db, 'users', email), { email, displayName, agentName, role });
+  }
+  showToast('✅ Default team loaded');
+}
 
 // A hotel stay (one hotel-block on a booking) can now book several room types at once
 // (e.g. 1 Standard + 1 Family for the same dates). Newer bookings store that as h.roomTypes:
@@ -1264,8 +1621,14 @@ window.render = function render() {
 
       const rtLines = hotelRoomTypeLines(h).filter(rt => (rt.roomType||'').trim());
       const roomTypeSub = rtLines.length ? `<div style="font-size:11px;color:#aaa;margin-top:2px">${rtLines.map(rt => `${esc(rt.roomType)} x${rt.rooms||1}`).join(', ')}</div>` : '';
+      const assignedSub = h.assignedAgent ? `<div style="font-size:11px;color:#1a6ea3;margin-top:2px">↳ Assigned: ${esc(h.assignedAgent)}</div>` : '';
+      const escalTrail = (h.escalations||[]).length
+        ? `<tr class="${alert ? 'hotel-alert' : ''}"><td colspan="10" style="padding:2px 8px 8px 24px;font-size:11px;color:#888;border-top:none">${
+            h.escalations.map(esn => `↳ Escalated to <strong>${esc(esn.to)}</strong> by ${esc(esn.from)} on ${esc((esn.date||'').split('T')[0])}${esn.note ? ' — “'+esc(esn.note)+'”' : ''}`).join('<br>')
+          }</td></tr>`
+        : '';
       return `<tr class="${alert ? 'hotel-alert' : ''}">
-        <td><strong>${esc(h.name)}</strong>${roomTypeSub}</td>
+        <td><strong>${esc(h.name)}</strong>${roomTypeSub}${assignedSub}</td>
         <td>${h.checkin || '—'}</td>
         <td>${hotelTotalRooms(h)}</td>
         <td>${statusBadge}</td>
@@ -1278,7 +1641,7 @@ window.render = function render() {
           ${alert ? `<button class="icon-btn" title="Copy follow-up email" onclick="copyFollowup('${b.id}','${h.id}',event)" style="color:#c0392b"><i class="ti ti-mail"></i></button>` : ''}
           <button class="icon-btn" title="Mark replied / confirmed" onclick="markHotelReplied('${b.id}','${h.id}',event)" style="color:#2d6e2d"><i class="ti ti-check"></i></button>
         </div></td>
-      </tr>`;
+      </tr>${escalTrail}`;
     }).join('');
 
     return `<div class="booking-card${cardAlertClass ? ' has-alert' : ''}${b.archived ? ' is-archived' : ''}" id="card-${b.id}">
