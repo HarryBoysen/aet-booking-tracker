@@ -1,4 +1,4 @@
-[STATUS.md](https://github.com/user-attachments/files/32387946/STATUS.md)
+[STATUS.md](https://github.com/user-attachments/files/32411454/STATUS.md)
 [STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
@@ -94,6 +94,15 @@ Harry opdagede at Hotels-listen under "Partners & Hotels" var tom (forventet —
 - Ny knap "Add all hotels from bookings" øverst til højre, kun synlig når "Hotels"-filteret er valgt. Bruger samme kilde som booking-formularens hotel-dropdown (`knownHotelNames()` — Allotments + eksisterende bookinger), og opretter et nyt CRM Hotels-kort for hvert navn der endnu ikke har et. Viser antal + en kort liste af navne til bekræftelse, før noget oprettes.
 - Overskriver eller sletter aldrig noget eksisterende — kan trygt køres flere gange (opretter ikke dubletter, tjekker uafhængigt af store/små bogstaver). Åben for alle (ikke admin-only), da den kun tilføjer, aldrig retter/sletter.
 - Testet (Playwright, ny `test_sync_hotels.js` + fuld regressionssuite — ingen regressioner): knap kun synlig på Hotels-visningen; alle manglende hotelnavne fra bookinger/allotments bliver oprettet; et navn der allerede findes i CRM'en springes over; kørt to gange giver ikke dubletter.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## "Mulige duplikat-hoteller"-panel i Hotels-fanen – bygget og testet, AFVENTER Harrys godkendelse
+Harry spurgte "kan du tjekker hoteller og sende mig en liste med dem der minder om hinanden?" — jeg har ikke direkte adgang til jeres rigtige Firestore-data herfra, så løsningen er et permanent, selvbetjent panel i appen i stedet for en engangsliste fra mig.
+
+- Nyt advarselspanel øverst i Hotels-fanen (kun synligt når "Hotels"-filteret er valgt), der viser grupper af hotelnavne der ligner hinanden — fx netop "Koh Kood Paradise Beach Resort" / "Koh Kood Paradise Resort" fra Harrys skærmbilleder. Genbruger samme dubletdetektor og samme "husk mine beslutninger"-collection (`dismissedDuplicates`) som det eksisterende panel i Response Stats — men er BREDERE: det tjekker hele `knownHotelNames()` (CRM Hotels + Allotments + bookinger), ikke kun navne der allerede har bookinger. Det er netop det der fangede Harrys eget eksempel, som ellers ikke ville dukke op i Response Stats-panelet (0 bookinger endnu på nogen af de to kort).
+- Selve dubletdetektoren (`findPossibleDuplicateHotelNames`, delt af begge paneler) er samtidig gjort en anelse skarpere: den fangede tidligere kun navne der er præfiks/suffiks-varianter af hinanden (fx "Koh Chang Resort" / "Koh Chang Resort & Spa"). Harrys eget eksempel har et ekstra ord midt i navnet ("...Paradise **Beach** Resort" vs "...Paradise Resort"), som den gamle logik ikke fangede. Ny regel: hvis det korteste navn har mindst 3 ord, og ALLE de ord også findes i det andet navn, regnes de som mulige dubletter — testet grundigt for ikke at give falske positiver på hoteller der bare tilfældigt deler 1-2 generiske ord (fx to forskellige "... Resort").
+- To knapper pr. gruppe: "Yes, same hotel — merge" (kun admin — bruger samme `renameHotelEverywhere()` som det eksisterende omdøb/flet-værktøj, retter bookinger + allotments + CRM-kort, og lægger evt. flere CRM-kort med samme endelige navn sammen til ét med kombinerede noter) og "No, different hotels" (alle kan bruge denne — gemmer beslutningen, så panelet ikke bliver ved med at foreslå det samme igen; delt med Response Stats-panelet, så en afvisning ét sted også gælder det andet).
+- Testet (Playwright, ny `test_crm_duplicate_finder.js` + fuld regressionssuite på 20 testscripts — ingen regressioner): panelet viser en dukket-op-duplikat med 0 bookinger; ikke-admin ser gruppen men intet flet-knap; admin-fletning kollapser to CRM-kort til ét med kombinerede noter og opdaterer bookinger/allotments; en afvist gruppe forsvinder og forbliver væk.
 - **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
 
 ## Åbent spørgsmål (afventer svar)
