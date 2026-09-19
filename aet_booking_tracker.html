@@ -2359,6 +2359,7 @@ function diffBookingChanges(before, after) {
 
 window.saveBooking = async function() {
   clearFieldErrors();
+  try {
   const refEl = document.getElementById('f-ref'), agentEl = document.getElementById('f-agent'),
         guestEl = document.getElementById('f-guest'), paxEl = document.getElementById('f-pax'),
         partnerEl = document.getElementById('f-partner');
@@ -2500,6 +2501,14 @@ window.saveBooking = async function() {
   window.closeModal('modal');
   if (newHotelNames.length) notices.push(`Added to Hotels list: ${newHotelNames.join(', ')}`);
   if (notices.length) showToast(`✅ Saved — ${notices.join('; ')}`);
+  } catch (err) {
+    // Previously a failed save (e.g. a Firestore permission error, a stale/expired login, or any
+    // unexpected JS error) did NOTHING visible — modal stayed open, "Save Booking" looked like it
+    // just didn't work, no clue why. Now any such failure is shown directly in the modal instead
+    // of failing silently, and logged to the browser console (F12 → Console) for troubleshooting.
+    console.error('saveBooking failed:', err);
+    showFormBanner('Could not save: ' + (err && err.message ? err.message : String(err)) + '. If this keeps happening, try refreshing the page and logging in again, or contact Harry.');
+  }
 }
 
 window.editBooking = function(id) { const b = bookings.find(x => x.id === id); if (b) { expandedCards.add(id); window.openModal(b); } }
