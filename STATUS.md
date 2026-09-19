@@ -1,4 +1,4 @@
-[STATUS.md](https://github.com/user-attachments/files/32411454/STATUS.md)
+[STATUS.md](https://github.com/user-attachments/files/32411818/STATUS.md)
 [STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
@@ -104,6 +104,14 @@ Harry spurgte "kan du tjekker hoteller og sende mig en liste med dem der minder 
 - To knapper pr. gruppe: "Yes, same hotel — merge" (kun admin — bruger samme `renameHotelEverywhere()` som det eksisterende omdøb/flet-værktøj, retter bookinger + allotments + CRM-kort, og lægger evt. flere CRM-kort med samme endelige navn sammen til ét med kombinerede noter) og "No, different hotels" (alle kan bruge denne — gemmer beslutningen, så panelet ikke bliver ved med at foreslå det samme igen; delt med Response Stats-panelet, så en afvisning ét sted også gælder det andet).
 - Testet (Playwright, ny `test_crm_duplicate_finder.js` + fuld regressionssuite på 20 testscripts — ingen regressioner): panelet viser en dukket-op-duplikat med 0 bookinger; ikke-admin ser gruppen men intet flet-knap; admin-fletning kollapser to CRM-kort til ét med kombinerede noter og opdaterer bookinger/allotments; en afvist gruppe forsvinder og forbliver væk.
 - **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Fejlmeddelelse ved mislykket gem (2026-09-19) – bygget og testet, AFVENTER Harrys godkendelse
+Harry rapporterede: ændrede check-out-dato på booking 35851 ("Golden Beach Resort Krabi", 18/01→25/01, altså en gyldig dato-ændring), men "Save Booking" gjorde ingenting — ingen fejl, ingen kvittering. Ved gennemgang af koden var det en reel mangel: hvis selve gemningen fejler (fx udløbet login, midlertidigt netværksproblem, Firestore-afvisning), var der ingen fejlhåndtering — modalen blev bare stående uden forklaring, præcis som Harry oplevede.
+
+- `saveBooking()` er nu pakket ind i try/catch. Fejler gemningen af en hvilken som helst årsag, vises nu en tydelig rød besked øverst i modalen ("Could not save: ... — try refreshing the page and logging in again, or contact Harry"), og den fulde tekniske fejl logges i browserens konsol (F12) til fejlsøgning.
+- Retter IKKE i sig selv årsagen til Harrys konkrete problem (den kender jeg stadig ikke, uden adgang til jeres rigtige data) — men gør fremtidige mislykkede gemninger synlige i stedet for stille, så det kan diagnosticeres med det samme.
+- Testet (Playwright, ny `test_save_error_visible.js` + fuld regressionssuite på 21 testscripts — ingen regressioner): en simuleret mislykket gemning viser nu fejlbeskeden i modalen i stedet for at lukke stille ned.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav). Afventer desuden Harrys faktiske fejltekst fra browser-konsollen for at finde selve root cause.**
 
 ## Åbent spørgsmål (afventer svar)
 - Sold-Out Calendar-artifact (separat værktøj, ikke denne tracker): forslag om at tilføje en note under "Allotment Availability" om at et hotels STOP SALE report betyder tabt allotment, selvom en tip stadig viser grøn. Ikke lagt ind endnu – afventer "ja/nej".
