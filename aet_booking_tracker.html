@@ -267,6 +267,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
         </div>
         <button class="btn sm" id="crmSyncHotelsBtn" style="display:none" onclick="syncHotelsFromBookings()"><i class="ti ti-refresh"></i> Add all hotels from bookings</button>
       </div>
+      <div id="crmHotelDuplicatesWrap"></div>
       <div class="crm-grid" id="crmGrid"></div>
     </div>
     <div id="crmDetailView" style="display:none"></div>
@@ -555,6 +556,7 @@ let expandedCards = new Set();
 let expandedAllotments = new Set();
 let expandedStatsHotels = new Set();
 let lastStatsRows = [];
+let lastCrmDupGroups = []; // the groups currently shown in the Hotels CRM tab's duplicate-name panel
 let currentUserEmail = '';
 let currentUserName = '';
 let presenceEntries = {}; // uid -> {email, name, lastSeen(ms)}
@@ -686,6 +688,7 @@ function startApp() {
   onSnapshot(collection(db, 'dismissedDuplicates'), (snap) => {
     dismissedDuplicates = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderStats();
+    renderCrm();
   });
 
   onSnapshot(collection(db, 'presence'), (snap) => {
@@ -2604,6 +2607,7 @@ function normalizeHotelName(name) {
 function findPossibleDuplicateHotelNames(names) {
   const uniq = [...new Set(names.map(n => (n||'').trim()).filter(Boolean))];
   const norm = uniq.map(n => normalizeHotelName(n));
+  const tokens = norm.map(n => n.split(' ').filter(Boolean));
   const parent = uniq.map((_, i) => i);
   const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
   const union = (i, j) => { const ri = find(i), rj = find(j); if (ri !== rj) parent[ri] = rj; };
@@ -2611,7 +2615,15 @@ function findPossibleDuplicateHotelNames(names) {
     for (let j = i + 1; j < uniq.length; j++) {
       if (norm[i] === norm[j]) { union(i, j); continue; } // same after normalizing (e.g. only punctuation differed)
       if (norm[i].length < 5 || norm[j].length < 5) continue; // too short to compare safely
-      if (norm[i].includes(norm[j]) || norm[j].includes(norm[i])) union(i, j);
+      if (norm[i].includes(norm[j]) || norm[j].includes(norm[i])) { union(i, j); continue; }
+      // Word-set match: catches variants where a word is inserted/removed in the MIDDLE of the
+      // name (e.g. "Koh Kood Paradise Beach Resort" vs "Koh Kood Paradise Resort") — the plain
+      // substring check above only catches prefix/suffix differences, since "paradise resort"
+      // isn't a contiguous substring once "beach" sits between them. Require the shorter name to
+      // have at least 3 words and ALL of them present in the other name, so two hotels that merely
+      // share one or two generic words (e.g. both ending in "...Resort") aren't falsely flagged.
+      const [shortTokens, longTokens] = tokens[i].length <= tokens[j].length ? [tokens[i], tokens[j]] : [tokens[j], tokens[i]];
+      if (shortTokens.length >= 3 && shortTokens.every(t => longTokens.includes(t))) union(i, j);
     }
   }
   const groups = {};
@@ -2809,6 +2821,83 @@ function renderCrm() {
       <span class="crm-card-notecount">${(item.notes||[]).length} note${(item.notes||[]).length===1?'':'s'}</span>
     </div>
   `).join('') + `<div class="add-crm-card" onclick="openCrmModal()"><i class="ti ti-plus"></i> ${addLabel}</div>`;
+
+  // Possible-duplicate panel, scoped to the FULL known-hotel list (CRM + allotments + bookings),
+  // not just names that already have bookings — so it catches CRM-only look-alikes like two
+  // freshly-added hotel cards with 0 notes/bookings each, which the narrower Response Stats
+  // panel (booking-lines only) can't see. Reuses the same detector/dismiss data as that panel.
+  const dupWrap = document.getElementById('crmHotelDuplicatesWrap');
+  if (dupWrap) {
+    if (crmType !== 'hotels') {
+      dupWrap.innerHTML = '';
+    } else {
+      const dismissedKeys = new Set(dismissedDuplicates.map(d => d.key));
+      const dupGroups = findPossibleDuplicateHotelNames(knownHotelNames()).filter(g => !dismissedKeys.has(duplicateGroupKey(g)));
+      lastCrmDupGroups = dupGroups;
+      const admin = isAdminViewer();
+      dupWrap.innerHTML = dupGroups.length === 0 ? '' : `<div style="background:#fef3e2;border:0.5px solid #f0d9a8;border-radius:12px;padding:12px 16px;margin-bottom:14px;font-size:13px;color:#7a4a00">
+        <strong>⚠ Possible duplicate hotel names — same hotel?</strong> These look like the same hotel spelled differently.
+        <ul style="margin:8px 0 0;padding-left:20px;list-style:none">
+          ${dupGroups.map((g,i) => `<li style="margin-bottom:10px">
+            <div>${g.map(n => `<strong>${esc(n)}</strong> (${countHotelUsage(n).bookingsCount} booking${countHotelUsage(n).bookingsCount===1?'':'s'})`).join(' &nbsp;/&nbsp; ')}</div>
+            <div style="margin-top:4px;display:flex;gap:6px">
+              ${admin ? `<button class="btn" style="padding:3px 10px;font-size:11px;background:#1a7a55;color:#fff;border:none" onclick="mergeHotelNameGroup(${i})">Yes, same hotel — merge</button>` : `<span style="color:#9a7b3a">Ask an admin to merge these</span>`}
+              <button class="btn" style="padding:3px 10px;font-size:11px" onclick="dismissHotelNameGroup(${i})">No, different hotels</button>
+            </div>
+          </li>`).join('')}
+        </ul>
+      </div>`;
+    }
+  }
+}
+
+// "Same hotel — merge" for the Hotels CRM tab's duplicate panel. Wider than the Response Stats
+// version (mergeDuplicateHotelNames): that one only rewrites bookings, but a CRM-only duplicate
+// (like two freshly-added hotel cards with zero bookings yet) needs the hotelsCrm records
+// themselves collapsed too — so this uses renameHotelEverywhere (bookings + allotments + CRM)
+// per non-canonical name, then mergeHotelsCrmRecordsByName to fold any resulting same-named CRM
+// cards into one. Admin-only, same as every other rename/merge action on hotel names.
+window.mergeHotelNameGroup = async function(idx) {
+  if (!isAdminViewer()) { showToast('Only an admin can merge hotel names'); return; }
+  const group = lastCrmDupGroups[idx];
+  if (!group) return;
+  const usage = {};
+  group.forEach(n => { usage[n] = countHotelUsage(n).bookingsCount; });
+  const canonical = group.slice().sort((a,b) => (usage[b]||0) - (usage[a]||0) || b.length - a.length)[0];
+  const others = group.filter(n => n !== canonical);
+  const totalBookings = others.reduce((s,n) => s + (usage[n]||0), 0);
+  const ok = confirm(`Merge ${others.map(o => '"'+o+'"').join(' and ')} into "${canonical}"?\n\nThis updates ${totalBookings} booking${totalBookings===1?'':'s'} plus any matching Allotments and Hotels-list cards. Cannot be undone.`);
+  if (!ok) return;
+  for (const name of others) {
+    await renameHotelEverywhere(name, canonical);
+  }
+  await mergeHotelsCrmRecordsByName(canonical);
+  showToast(`✅ Merged into "${canonical}"`);
+}
+
+// After renameHotelEverywhere runs once per old spelling, the hotelsCrm collection can end up with
+// more than one record now sharing the same (canonical) name — collapse those into a single card,
+// combining their notes, keeping the earliest record's id and other fields.
+async function mergeHotelsCrmRecordsByName(canonicalName) {
+  const n = (canonicalName || '').trim().toLowerCase();
+  const matches = hotelsCrm.filter(h => (h.name || '').trim().toLowerCase() === n);
+  if (matches.length <= 1) return;
+  const keep = matches[0];
+  const mergedNotes = matches.flatMap(h => h.notes || []);
+  await setDoc(doc(db, 'hotelsCrm', keep.id), { ...keep, notes: mergedNotes });
+  for (const h of matches.slice(1)) {
+    await deleteDoc(doc(db, 'hotelsCrm', h.id));
+  }
+}
+
+// "No, different hotels" for the Hotels CRM tab's duplicate panel — same dismissedDuplicates
+// collection/key as the Response Stats panel, so dismissing it here also hides it there (and
+// vice versa), since it's the same underlying judgement about the same two names.
+window.dismissHotelNameGroup = async function(idx) {
+  const group = lastCrmDupGroups[idx];
+  if (!group) return;
+  const key = duplicateGroupKey(group);
+  await setDoc(doc(db, 'dismissedDuplicates', key), { key, names: group });
 }
 
 // One-off (and repeatable) backfill: adds a Hotels-list contact card for every hotel name already
