@@ -199,6 +199,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div class="top-tab" data-tab="crm" onclick="switchTab('crm')"><i class="ti ti-users"></i> Partners &amp; Hotels</div>
     <div class="top-tab" data-tab="sop" onclick="switchTab('sop')"><i class="ti ti-book"></i> Playbook / SOPs</div>
     <div class="top-tab" data-tab="allotments" onclick="switchTab('allotments')"><i class="ti ti-bed"></i> Allotments</div>
+    <div class="top-tab" data-tab="lomprayah" onclick="switchTab('lomprayah')"><i class="ti ti-anchor"></i> Lomprayah Tickets</div>
+    <div class="top-tab" data-tab="train" onclick="switchTab('train')"><i class="ti ti-train"></i> Train Tickets</div>
   </div>
 
   <!-- MY ACTION LIST TAB -->
@@ -304,6 +306,48 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
     <div id="allotmentList"></div>
     <div id="allotmentEmpty" class="empty" style="display:none">No allotments yet — add the first one!</div>
   </div>
+
+  <!-- LOMPRAYAH TICKETS TAB -->
+  <div class="tab-panel" id="panel-lomprayah">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <button class="btn primary" onclick="openTicketModal('lomprayah')"><i class="ti ti-plus"></i> Add Lomprayah ticket</button>
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setTransportFilter('lomprayah','all',this)">Upcoming</button>
+      <button class="filter-btn" onclick="setTransportFilter('lomprayah','notbooked',this)">Not booked</button>
+      <button class="filter-btn" onclick="setTransportFilter('lomprayah','notsent',this)">Not sent</button>
+      <button class="filter-btn" onclick="setTransportFilter('lomprayah','next7',this)">Next 7 days</button>
+      <button class="filter-btn" onclick="setTransportFilter('lomprayah','history',this)">History</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="lomprayahSearch" placeholder="Search guest, booking ref, route..." oninput="renderTransportTab('lomprayah')">
+      <select id="lomprayahAgentFilter" onchange="renderTransportTab('lomprayah')"><option value="">All agents</option></select>
+      <label style="font-size:13px;color:#666;display:flex;align-items:center;gap:6px"><input type="checkbox" id="lomprayahShowCancelled" onchange="renderTransportTab('lomprayah')"> Show cancelled</label>
+    </div>
+    <div id="lomprayahList"></div>
+    <div id="lomprayahEmpty" class="empty" style="display:none">No Lomprayah tickets match this view.</div>
+  </div>
+
+  <!-- TRAIN TICKETS TAB -->
+  <div class="tab-panel" id="panel-train">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:1rem">
+      <button class="btn primary" onclick="openTicketModal('train')"><i class="ti ti-plus"></i> Add Train ticket</button>
+    </div>
+    <div class="filter-row">
+      <button class="filter-btn active" onclick="setTransportFilter('train','all',this)">Upcoming</button>
+      <button class="filter-btn" onclick="setTransportFilter('train','notbooked',this)">Not booked</button>
+      <button class="filter-btn" onclick="setTransportFilter('train','notsent',this)">Not sent</button>
+      <button class="filter-btn" onclick="setTransportFilter('train','next7',this)">Next 7 days</button>
+      <button class="filter-btn" onclick="setTransportFilter('train','history',this)">History</button>
+    </div>
+    <div class="toolbar">
+      <input type="text" id="trainSearch" placeholder="Search guest, booking ref, route..." oninput="renderTransportTab('train')">
+      <select id="trainAgentFilter" onchange="renderTransportTab('train')"><option value="">All agents</option></select>
+      <label style="font-size:13px;color:#666;display:flex;align-items:center;gap:6px"><input type="checkbox" id="trainShowCancelled" onchange="renderTransportTab('train')"> Show cancelled</label>
+    </div>
+    <div id="trainList"></div>
+    <div id="trainEmpty" class="empty" style="display:none">No Train tickets match this view.</div>
+  </div>
 </div>
 
 <!-- Booking Modal -->
@@ -396,6 +440,84 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <div class="modal-footer">
     <button class="btn" onclick="closeModal('sopModal')">Cancel</button>
     <button class="btn primary" onclick="saveSop()">Save SOP</button>
+  </div>
+</div>
+</div>
+
+<!-- Lomprayah / Train Ticket Modal (shared — fields relabelled per ticket-type) -->
+<div class="modal-bg" id="ticketModal" onclick="bgClose(event,'ticketModal')">
+<div class="modal wide">
+  <h2 id="ticketModalTitle">New Ticket</h2>
+  <div id="ticketFormError" class="field-error-msg" style="display:none;margin-bottom:12px;font-size:13px"></div>
+
+  <div class="section-divider">Booking</div>
+  <div class="row3">
+    <div class="field"><label>Booking</label><select id="tk-booking" onchange="onTicketBookingChange()"><option value="">— Not linked to a booking yet —</option></select></div>
+    <div class="field"><label>Guest / Group Name</label><input id="tk-guest" placeholder="Guest or group name"></div>
+    <div class="field"><label>Partner</label><select id="tk-partner"><option value="">— None —</option></select></div>
+  </div>
+  <div id="tk-linked-note" style="display:none;font-size:11px;color:#888;margin:-8px 0 12px">Guest and Partner are filled in from the linked booking. Choose "— Not linked —" above to edit them directly.</div>
+  <div class="row3">
+    <div class="field"><label>Responsible Agent</label><input id="tk-agent" list="agentSuggestions" placeholder="Name"></div>
+    <div class="field"><label>Partner Reference No.</label><input id="tk-partnerref" placeholder="e.g. UT ref."></div>
+    <div class="field"><label>Booking Reference (display only)</label><input id="tk-bookingref" placeholder="e.g. 2026-0001" list="ticketBookingRefs"></div>
+  </div>
+
+  <div class="section-divider">Passengers</div>
+  <div class="row3">
+    <div class="field"><label>Adults</label><input type="number" id="tk-adults" min="0" value="1" oninput="renderTicketChildren()"></div>
+    <div class="field" style="grid-column:span 2"><label>Children (age at travel)</label><div id="tk-children-wrap"></div><button type="button" class="btn sm" onclick="addTicketChild()"><i class="ti ti-plus"></i> Add child</button></div>
+  </div>
+  <div style="font-size:12px;color:#888;margin:-8px 0 12px">Total pax: <span id="tk-total-pax">1</span></div>
+
+  <div class="section-divider">Route &amp; Timing</div>
+  <div class="row2">
+    <div class="field"><label id="tk-from-label">From</label><input id="tk-from" placeholder="e.g. Chiang Mai"></div>
+    <div class="field"><label id="tk-to-label">To</label><input id="tk-to" placeholder="e.g. Bangkok"></div>
+  </div>
+  <div class="row3">
+    <div class="field"><label>Departure Date</label><input type="date" id="tk-depdate" onchange="onTicketDepDateChange()"></div>
+    <div class="field"><label>Departure Time</label><input type="time" id="tk-deptime"></div>
+    <div class="field"><label>Arrival Date <span style="font-weight:400;color:#aaa">(if different — e.g. overnight train)</span></label><input type="date" id="tk-arrdate"></div>
+  </div>
+  <div class="row3">
+    <div class="field"><label>Arrival Time</label><input type="time" id="tk-arrtime"></div>
+    <div class="field" id="tk-vehicleno-field"><label id="tk-vehicleno-label">Train No.</label><input id="tk-vehicleno"></div>
+    <div class="field" id="tk-class-field"><label>Class</label><input id="tk-class" placeholder="e.g. 2nd class"></div>
+  </div>
+  <div class="row2" id="tk-wagon-seat-row">
+    <div class="field"><label>Wagon (Vogn)</label><input id="tk-wagon"></div>
+    <div class="field"><label>Seat / Berth (Plads/køje)</label><input id="tk-seat"></div>
+  </div>
+
+  <div class="section-divider">Follow-up</div>
+  <div class="row2">
+    <div class="field"><label>Booking Opens <span style="font-weight:400;color:#aaa">(if it can't be booked yet)</span></label><input type="date" id="tk-opensdate"></div>
+    <div class="field"><label>Follow-up Date <span style="font-weight:400;color:#aaa">(shows in agent's My Action List from this date, until booked)</span></label><input type="date" id="tk-followupdate"></div>
+  </div>
+
+  <div class="section-divider">Status</div>
+  <div class="row3">
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><input type="checkbox" id="tk-booked"> Booked</label></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><input type="checkbox" id="tk-paid"> Paid</label></div>
+    <div class="field"><label>Payment Due Date</label><input type="date" id="tk-paymentdue"></div>
+  </div>
+  <div class="row2">
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500"><input type="checkbox" id="tk-sent" onchange="renderTicketSentByNote()"> Sent to partner</label></div>
+    <div class="field" id="tk-sentby-note" style="display:none;font-size:12px;color:#888;align-self:center"></div>
+  </div>
+
+  <div class="section-divider">Ticket Details</div>
+  <div class="row3">
+    <div class="field"><label>Ticket No(s).</label><input id="tk-ticketnos" placeholder="e.g. TK1029, TK1030"></div>
+    <div class="field"><label>Invoice Number</label><input id="tk-invoiceno"></div>
+    <div class="field"><label>Price</label><input id="tk-price" placeholder="e.g. 300x2=600"></div>
+  </div>
+  <div class="field"><label>Notes</label><textarea id="tk-notes" style="min-height:60px" placeholder="Any remarks..."></textarea></div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#a33"><input type="checkbox" id="tk-cancelled"> Cancelled</label>
+  <div class="modal-footer">
+    <button class="btn" onclick="closeModal('ticketModal')">Cancel</button>
+    <button class="btn primary" onclick="saveTicket()">Save Ticket</button>
   </div>
 </div>
 </div>
@@ -541,6 +663,7 @@ let hotelsCrm = [];
 let sops = [];
 let trips = [];
 let allotments = [];
+let transportTickets = []; // Firestore 'transportTickets' collection — shared by the Lomprayah and Train Tickets tabs, {type: 'lomprayah'|'train', ...}
 let dismissedDuplicates = [];
 let users = []; // Firestore 'users' collection: {id, email, displayName, agentName, role}
 let actionViewAll = false; // when true (admin only), My Action List shows everyone's tasks
@@ -568,6 +691,10 @@ let editingCrmId = null;
 let editingSopId = null;
 let sopCategoryFilter = '';
 let editingAllotmentId = null;
+let editingTicketId = null;
+let editingTicketType = 'lomprayah'; // which tab a new ticket is being added from
+let ticketChildrenAges = [];
+let transportFilterState = { lomprayah: 'all', train: 'all' };
 
 // Nothing is fetched or shown until Firebase confirms the sign-in state.
 let appStarted = false;
@@ -638,6 +765,7 @@ function startApp() {
     renderActionList();
     refreshAgentSuggestions();
     refreshRoomTypeSuggestions();
+    refreshTicketBookingRefSuggestions();
   });
   onSnapshot(collection(db, 'users'), (snap) => {
     users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -662,6 +790,12 @@ function startApp() {
     allotments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderAllotments();
     refreshRoomTypeSuggestions();
+  });
+  onSnapshot(collection(db, 'transportTickets'), (snap) => {
+    transportTickets = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderTransportTab('lomprayah');
+    renderTransportTab('train');
+    renderActionList();
   });
   onSnapshot(collection(db, 'partners'), (snap) => {
     partners = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -759,6 +893,8 @@ window.switchTab = function(tab) {
   if (tab === 'stats-tab') renderStats();
   if (tab === 'allotments') renderAllotments();
   if (tab === 'action') renderActionList();
+  if (tab === 'lomprayah') renderTransportTab('lomprayah');
+  if (tab === 'train') renderTransportTab('train');
 }
 
 /* ---------- Helpers ---------- */
@@ -801,7 +937,7 @@ const SEV_RANK = { red: 0, amber: 1, neutral: 2 };
 
 function actionListRows(viewingAll) {
   const mine = myAgentName().toLowerCase();
-  const out = { followup: [], payment: [], pending: [] };
+  const out = { followup: [], payment: [], pending: [], transport: [] };
   bookings.filter(b => !b.archived).forEach(b => {
     (b.hotels || []).forEach(h => {
       const responsible = hotelResponsibleAgent(b, h);
@@ -861,7 +997,28 @@ function actionListRows(viewingAll) {
       }
     });
   });
-  [out.followup, out.payment, out.pending].forEach(list =>
+
+  // Transport tickets: a ticket surfaces here once its manually-set Follow-up Date has arrived and
+  // it's still not booked — not on a fixed rule for all trains, per Harry's explicit ask, since some
+  // trips genuinely can't be booked yet. Cleared automatically the moment "Booked" is ticked.
+  const todayStr = thailandTodayStr();
+  transportTickets.filter(t => !t.cancelled && !t.booked && t.followUpDate && t.followUpDate <= todayStr).forEach(t => {
+    const responsible = t.agent || '';
+    if (!viewingAll) {
+      if (!mine || !responsible || responsible.toLowerCase() !== mine) return;
+    }
+    const daysToDep = t.departureDate ? daysBetween(todayStr, t.departureDate) : null;
+    const severity = (daysToDep !== null && daysToDep <= 3) ? 'red' : 'amber';
+    out.transport.push({ t, category: 'transport', severity, responsible,
+      missing: (t.type === 'train' ? 'Train ticket not booked' : 'Lomprayah ticket not booked'),
+      waitedLabel: daysToDep === null ? 'No departure date set'
+        : daysToDep < 0 ? `Departure was ${Math.abs(daysToDep)}d ago`
+        : `Departs in ${daysToDep}d`,
+      dueLabel: `Follow-up due ${formatTicketDate(t.followUpDate)}`,
+      sortDays: daysToDep === null ? -999999 : -daysToDep });
+  });
+
+  [out.followup, out.payment, out.pending, out.transport].forEach(list =>
     list.sort((a, b2) => (SEV_RANK[a.severity] - SEV_RANK[b2.severity]) || (b2.sortDays - a.sortDays))
   );
   return out;
@@ -888,11 +1045,37 @@ function actionRowHtml(r, viewingAll) {
   </div>`;
 }
 
-function actionSectionHtml(title, list, viewingAll) {
+// Structurally different data shape than the hotel-line rows above ({t} instead of {b, h}), so this
+// section takes its own row renderer via actionSectionHtml's optional 4th argument, reusing the same
+// section-wrapper markup rather than duplicating it.
+function ticketActionRowHtml(r, viewingAll) {
+  const agentTag = viewingAll ? `<span class="action-agent-tag">${esc(r.responsible || '—')}</span>` : '';
+  const t = r.t;
+  return `<div class="action-row sev-${r.severity}">
+    <div class="action-row-main">
+      <div class="action-row-title">${esc(t.guest||'—')}${t.bookingRef ? ' · ' + esc(t.bookingRef) : ''}</div>
+      <div class="action-row-sub">${t.type === 'train' ? 'Train' : 'Lomprayah'} · ${esc(t.from||'—')} → ${esc(t.to||'—')} · ${formatTicketDate(t.departureDate)}</div>
+      <div class="action-row-waited">${esc(r.waitedLabel)}</div>
+      <div class="action-row-waited" style="color:#888">${esc(r.dueLabel)}</div>
+      <div style="margin-top:4px"><span class="badge b-${r.severity}">${esc(r.missing)}</span> ${agentTag}</div>
+    </div>
+    <div class="action-row-actions">
+      <button class="action-small-btn" title="Mark booked" onclick="markTicketBookedFromAction('${t.id}',event)"><i class="ti ti-check"></i> Mark booked</button>
+      <button class="action-small-btn" title="Open ticket" onclick='openTicketModal("${t.type}", ${JSON.stringify(t).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i> Open</button>
+    </div>
+  </div>`;
+}
+window.markTicketBookedFromAction = async function(id, e) {
+  if (e) e.stopPropagation();
+  await toggleTicketFlag(id, 'booked');
+}
+
+function actionSectionHtml(title, list, viewingAll, rowFn) {
   if (!list.length) return '';
+  const fn = rowFn || actionRowHtml;
   return `<div class="action-section">
     <div class="action-section-title">${esc(title)} <span class="action-section-count">(${list.length})</span></div>
-    ${list.map(r => actionRowHtml(r, viewingAll)).join('')}
+    ${list.map(r => fn(r, viewingAll)).join('')}
   </div>`;
 }
 
@@ -915,11 +1098,12 @@ function renderActionList() {
   const dueToday = rows.followup.filter(r => r.severity === 'amber').length;
   const paymentIssues = rows.payment.length;
   const awaitingReply = rows.pending.length;
-  const total = rows.followup.length + rows.payment.length + rows.pending.length;
+  const ticketsToBook = rows.transport.length;
+  const total = rows.followup.length + rows.payment.length + rows.pending.length + rows.transport.length;
 
   summaryEl.innerHTML = total === 0
     ? `<strong style="color:#2d6e2d">✓ No actions needed today</strong>`
-    : `${overdue} overdue · ${dueToday} due today · ${paymentIssues} payment issues${awaitingReply ? ` · ${awaitingReply} awaiting reply` : ''}`;
+    : `${overdue} overdue · ${dueToday} due today · ${paymentIssues} payment issues${awaitingReply ? ` · ${awaitingReply} awaiting reply` : ''}${ticketsToBook ? ` · ${ticketsToBook} tickets to book` : ''}`;
 
   if (total === 0) {
     wrapEl.innerHTML = `<div class="action-empty"><i class="ti ti-circle-check" style="font-size:28px;display:block;margin-bottom:8px;color:#2d6e2d"></i>No actions needed today</div>`;
@@ -929,7 +1113,8 @@ function renderActionList() {
   wrapEl.innerHTML =
     actionSectionHtml('Follow-up due today / overdue', rows.followup, viewingAll) +
     actionSectionHtml('Payment required', rows.payment, viewingAll) +
-    actionSectionHtml('Supplier reply pending', rows.pending, viewingAll);
+    actionSectionHtml('Supplier reply pending', rows.pending, viewingAll) +
+    actionSectionHtml('Transport tickets to book', rows.transport, viewingAll, ticketActionRowHtml);
 }
 
 /* ---------- Escalate modal ---------- */
@@ -3282,6 +3467,383 @@ window.renderSops = function renderSops() {
       ${open ? `<div class="sop-body">${esc(s.content)}<div class="sop-meta">Added by ${esc(s.author)} on ${s.createdDate}${s.updatedBy && s.updatedDate !== s.createdDate ? ` · last updated by ${esc(s.updatedBy)} on ${s.updatedDate}` : ''}</div></div>` : ''}
     </div>`;
   }).join('');
+}
+
+/* ---------- Lomprayah / Train Tickets ---------- */
+// Both tabs share one Firestore collection (`transportTickets`, distinguished by `type`) and one
+// render/edit/save/delete code path. Revised per Harry's 2026-09-23 feedback on the first draft:
+// tickets can now link to an existing booking (auto-filling guest/partner so nothing is typed
+// twice), track a manually-set follow-up date that surfaces the ticket in the responsible agent's
+// My Action List, separate Booked / Paid / Sent-to-partner into three independent facts (each with
+// its own stamp), record real ticket details (ticket no(s), wagon/seat, an attached file), split
+// departure/arrival date+time (so overnight trains are unambiguous) and adults/children pax with an
+// auto-totalled count, and add work-overview filters (Not booked / Not sent / Next 7 days / History)
+// plus a responsible-agent filter — upcoming trips show by default, older ones move to History.
+const TICKET_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatTicketDate(dateStr) {
+  if (!dateStr) return '—';
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return dateStr;
+  const mi = parseInt(parts[1], 10) - 1;
+  if (mi < 0 || mi > 11 || !parseInt(parts[2], 10)) return dateStr;
+  return `${parseInt(parts[2], 10)} ${TICKET_MONTHS[mi]} ${parts[0]}`;
+}
+function knownBookingRefs() {
+  return [...new Set(bookings.map(b => (b.ref||'').trim()).filter(Boolean))].sort();
+}
+window.refreshTicketBookingRefSuggestions = function() {
+  ensureDatalist('ticketBookingRefs').innerHTML = knownBookingRefs().map(n => `<option value="${esc(n)}">`).join('');
+}
+function refreshTicketPartnerDropdown() {
+  const sel = document.getElementById('tk-partner');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— None —</option>' + partners.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
+}
+// One booking can have several ferry/train legs, so this is a plain dropdown of open bookings, not
+// tied one-to-one to a ticket — picking one just pre-fills this ticket from it.
+function refreshTicketBookingSelect() {
+  const sel = document.getElementById('tk-booking');
+  if (!sel) return;
+  const list = bookings.filter(b => !b.archived).slice().sort((a,b2) => (a.ref||'').localeCompare(b2.ref||''));
+  sel.innerHTML = '<option value="">— Not linked to a booking yet —</option>' +
+    list.map(b => `<option value="${esc(b.id)}">${esc(b.ref||'—')} — ${esc(b.guest||'—')}</option>`).join('');
+}
+function showTicketFormError(msg) {
+  const el = document.getElementById('ticketFormError');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.display = '';
+}
+
+// Linking a booking auto-fills + locks Guest/Partner (so they can only ever match the booking) and
+// hides the manual booking-ref field in favour of the booking's own ref; choosing "— Not linked —"
+// reverts both to free text. Responsible Agent is pre-filled from the booking too, but stays
+// editable, since who handles a given leg can differ from who owns the booking.
+window.onTicketBookingChange = function() {
+  const bookingId = document.getElementById('tk-booking').value;
+  const guestEl = document.getElementById('tk-guest');
+  const partnerEl = document.getElementById('tk-partner');
+  const agentEl = document.getElementById('tk-agent');
+  const bookingRefField = document.getElementById('tk-bookingref').closest('.field');
+  const note = document.getElementById('tk-linked-note');
+  if (bookingId) {
+    const b = bookings.find(x => x.id === bookingId);
+    if (b) {
+      guestEl.value = b.guest || '';
+      partnerEl.value = b.partnerId || '';
+      if (!agentEl.value.trim()) agentEl.value = b.agent || '';
+    }
+    guestEl.disabled = true;
+    partnerEl.disabled = true;
+    if (bookingRefField) bookingRefField.style.display = 'none';
+    if (note) note.style.display = '';
+  } else {
+    guestEl.disabled = false;
+    partnerEl.disabled = false;
+    if (bookingRefField) bookingRefField.style.display = '';
+    if (note) note.style.display = 'none';
+  }
+}
+
+// Child ages are held as a plain in-memory array and rendered directly on each keystroke via inline
+// oninput, rather than a full re-render per keystroke, so focus is never lost mid-edit.
+window.addTicketChild = function() {
+  ticketChildrenAges.push('');
+  renderTicketChildren();
+}
+window.removeTicketChild = function(idx) {
+  ticketChildrenAges.splice(idx, 1);
+  renderTicketChildren();
+}
+// Inline oninput handlers run in the global scope, not this module's scope, so a direct assignment
+// to the module-level ticketChildrenAges array from an attribute string would fail — this setter is
+// exposed on window so the inline handler has something it can actually call.
+window.setTicketChildAge = function(idx, val) {
+  ticketChildrenAges[idx] = val;
+}
+window.renderTicketChildren = function() {
+  const wrap = document.getElementById('tk-children-wrap');
+  if (wrap) {
+    wrap.innerHTML = ticketChildrenAges.map((age, i) => `
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px">
+        <input type="number" min="0" max="17" value="${esc(age)}" placeholder="Age" style="width:70px" oninput="setTicketChildAge(${i},this.value)">
+        <button type="button" class="icon-btn" onclick="removeTicketChild(${i})"><i class="ti ti-x"></i></button>
+      </div>`).join('');
+  }
+  const adults = parseInt(document.getElementById('tk-adults').value, 10) || 0;
+  const totalEl = document.getElementById('tk-total-pax');
+  if (totalEl) totalEl.textContent = adults + ticketChildrenAges.length;
+}
+
+// Most legs arrive the same day — default Arrival Date to match Departure Date so it's one less
+// thing to type, but only if arrival is still empty (never overwrite a night-train date already set).
+window.onTicketDepDateChange = function() {
+  const dep = document.getElementById('tk-depdate').value;
+  const arrEl = document.getElementById('tk-arrdate');
+  if (dep && !arrEl.value) arrEl.value = dep;
+}
+
+// Shows who/when sent for an already-sent ticket, or a preview of who it'll be stamped as once
+// saved — so "Sent to partner" always records who and when, not just yes/no.
+window.renderTicketSentByNote = function() {
+  const checked = document.getElementById('tk-sent').checked;
+  const noteEl = document.getElementById('tk-sentby-note');
+  if (!noteEl) return;
+  if (!checked) { noteEl.style.display = 'none'; noteEl.textContent = ''; return; }
+  const existing = editingTicketId ? transportTickets.find(t => t.id === editingTicketId) : null;
+  noteEl.textContent = (existing && existing.sentToPartner && existing.sentBy)
+    ? `Sent by ${existing.sentBy} on ${formatTicketDate(existing.sentDate)}`
+    : `Will be marked as sent by ${myAgentName() || currentUserName} today`;
+  noteEl.style.display = '';
+}
+
+function refreshTicketAgentFilterOptions(type) {
+  const sel = document.getElementById(type + 'AgentFilter');
+  if (!sel) return;
+  const current = sel.value;
+  const names = [...new Set(transportTickets.filter(t => t.type === type).map(t => t.agent).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">All agents</option>' + names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  if (names.includes(current)) sel.value = current;
+}
+
+window.setTransportFilter = function(type, filter, el) {
+  transportFilterState[type] = filter;
+  const row = el ? el.closest('.filter-row') : null;
+  if (row) row.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderTransportTab(type);
+}
+
+window.openTicketModal = function(type, ticket) {
+  editingTicketId = ticket ? ticket.id : null;
+  editingTicketType = ticket ? ticket.type : type;
+  const isTrain = editingTicketType === 'train';
+  ticketChildrenAges = (ticket && Array.isArray(ticket.childrenAges)) ? ticket.childrenAges.slice() : [];
+
+  document.getElementById('ticketFormError').style.display = 'none';
+  document.getElementById('ticketModalTitle').textContent = (ticket ? 'Edit ' : 'New ') + (isTrain ? 'Train Ticket' : 'Lomprayah Ticket');
+
+  refreshTicketBookingSelect();
+  refreshTicketPartnerDropdown();
+  refreshTicketBookingRefSuggestions();
+
+  document.getElementById('tk-booking').value = ticket ? (ticket.bookingId||'') : '';
+  document.getElementById('tk-guest').value = ticket ? (ticket.guest||'') : '';
+  document.getElementById('tk-partner').value = ticket ? (ticket.partnerId||'') : '';
+  document.getElementById('tk-agent').value = ticket ? (ticket.agent||'') : '';
+  document.getElementById('tk-partnerref').value = ticket ? (ticket.partnerRef||'') : '';
+  document.getElementById('tk-bookingref').value = ticket ? (ticket.bookingRef||'') : '';
+
+  document.getElementById('tk-adults').value = ticket ? (ticket.adults != null ? ticket.adults : 1) : 1;
+  renderTicketChildren();
+
+  document.getElementById('tk-from').placeholder = isTrain ? 'e.g. Chiang Mai' : 'e.g. Koh Samui Pier (Pralarn)';
+  document.getElementById('tk-to').placeholder = isTrain ? 'e.g. Bangkok' : 'e.g. Koh Phangan';
+  document.getElementById('tk-from').value = ticket ? (ticket.from||'') : '';
+  document.getElementById('tk-to').value = ticket ? (ticket.to||'') : '';
+
+  document.getElementById('tk-depdate').value = ticket ? (ticket.departureDate||'') : '';
+  document.getElementById('tk-deptime').value = ticket ? (ticket.departureTime||'') : '';
+  document.getElementById('tk-arrdate').value = ticket ? (ticket.arrivalDate||'') : '';
+  document.getElementById('tk-arrtime').value = ticket ? (ticket.arrivalTime||'') : '';
+
+  document.getElementById('tk-vehicleno-label').textContent = isTrain ? 'Train No.' : 'Boat/Ferry No.';
+  document.getElementById('tk-vehicleno').value = ticket ? (ticket.vehicleNo||'') : '';
+  document.getElementById('tk-class').value = ticket ? (ticket.classInfo||'') : '';
+  document.getElementById('tk-wagon-seat-row').style.display = isTrain ? '' : 'none';
+  document.getElementById('tk-wagon').value = ticket ? (ticket.wagon||'') : '';
+  document.getElementById('tk-seat').value = ticket ? (ticket.seat||'') : '';
+
+  document.getElementById('tk-opensdate').value = ticket ? (ticket.bookingOpensDate||'') : '';
+  document.getElementById('tk-followupdate').value = ticket ? (ticket.followUpDate||'') : '';
+
+  document.getElementById('tk-booked').checked = ticket ? !!ticket.booked : false;
+  document.getElementById('tk-paid').checked = ticket ? !!ticket.paid : false;
+  document.getElementById('tk-paymentdue').value = ticket ? (ticket.paymentDueDate||'') : '';
+  document.getElementById('tk-sent').checked = ticket ? !!ticket.sentToPartner : false;
+
+  document.getElementById('tk-ticketnos').value = ticket ? (ticket.ticketNumbers||'') : '';
+  document.getElementById('tk-invoiceno').value = ticket ? (ticket.invoiceNo||'') : '';
+  document.getElementById('tk-price').value = ticket ? (ticket.price||'') : '';
+
+  document.getElementById('tk-notes').value = ticket ? (ticket.notes||'') : '';
+  document.getElementById('tk-cancelled').checked = ticket ? !!ticket.cancelled : false;
+
+  onTicketBookingChange();
+  renderTicketSentByNote();
+
+  document.getElementById('ticketModal').classList.add('open');
+}
+
+window.saveTicket = async function() {
+  const guest = document.getElementById('tk-guest').value.trim();
+  const depDate = document.getElementById('tk-depdate').value;
+  document.getElementById('ticketFormError').style.display = 'none';
+  if (!guest) { showTicketFormError('Guest / group name is required.'); return; }
+  if (!depDate) { showTicketFormError('Departure date is required.'); return; }
+
+  const bookingId = document.getElementById('tk-booking').value;
+  const linkedBooking = bookingId ? bookings.find(b => b.id === bookingId) : null;
+  const partnerId = document.getElementById('tk-partner').value;
+  const partnerName = partnerId ? (partners.find(p=>p.id===partnerId)||{}).name || '' : '';
+  const booked = document.getElementById('tk-booked').checked;
+  const paid = document.getElementById('tk-paid').checked;
+  const sentToPartner = document.getElementById('tk-sent').checked;
+  const adults = parseInt(document.getElementById('tk-adults').value, 10) || 0;
+  const childrenAges = ticketChildrenAges.slice();
+  const existing = editingTicketId ? transportTickets.find(t=>t.id===editingTicketId) : null;
+
+  const ticket = {
+    id: editingTicketId || ('tk_' + Date.now() + '_' + Math.random().toString(36).slice(2,7)),
+    type: editingTicketType,
+    bookingId: bookingId || '',
+    bookingRef: linkedBooking ? (linkedBooking.ref || '') : document.getElementById('tk-bookingref').value.trim(),
+    guest,
+    partnerId, partnerName,
+    agent: document.getElementById('tk-agent').value.trim(),
+    partnerRef: document.getElementById('tk-partnerref').value.trim(),
+    adults,
+    childrenAges,
+    totalPax: adults + childrenAges.length,
+    from: document.getElementById('tk-from').value.trim(),
+    to: document.getElementById('tk-to').value.trim(),
+    departureDate: depDate,
+    departureTime: document.getElementById('tk-deptime').value,
+    arrivalDate: document.getElementById('tk-arrdate').value,
+    arrivalTime: document.getElementById('tk-arrtime').value,
+    vehicleNo: document.getElementById('tk-vehicleno').value.trim(),
+    classInfo: document.getElementById('tk-class').value.trim(),
+    wagon: document.getElementById('tk-wagon').value.trim(),
+    seat: document.getElementById('tk-seat').value.trim(),
+    bookingOpensDate: document.getElementById('tk-opensdate').value,
+    followUpDate: document.getElementById('tk-followupdate').value,
+    booked,
+    // Stamp today's date the moment a box is first ticked; keep the original stamp on later edits
+    // that leave it checked; clear it if unticked again — same pattern as deposit/credit-card.
+    bookedDate: booked ? ((existing && existing.booked) ? existing.bookedDate : new Date().toISOString().split('T')[0]) : '',
+    paid,
+    paymentDueDate: document.getElementById('tk-paymentdue').value,
+    sentToPartner,
+    sentBy: sentToPartner ? ((existing && existing.sentToPartner) ? existing.sentBy : (myAgentName() || currentUserName)) : '',
+    sentDate: sentToPartner ? ((existing && existing.sentToPartner) ? existing.sentDate : new Date().toISOString().split('T')[0]) : '',
+    ticketNumbers: document.getElementById('tk-ticketnos').value.trim(),
+    invoiceNo: document.getElementById('tk-invoiceno').value.trim(),
+    price: document.getElementById('tk-price').value.trim(),
+    cancelled: document.getElementById('tk-cancelled').checked,
+    notes: document.getElementById('tk-notes').value.trim(),
+    createdBy: existing ? existing.createdBy : currentUserName,
+    createdDate: existing ? existing.createdDate : new Date().toISOString().split('T')[0],
+    updatedBy: currentUserName,
+    updatedDate: new Date().toISOString().split('T')[0]
+  };
+  try {
+    await setDoc(doc(db, 'transportTickets', ticket.id), ticket);
+    window.closeModal('ticketModal');
+  } catch (err) {
+    console.error('saveTicket failed:', err);
+    showTicketFormError('Could not save: ' + (err && err.message ? err.message : String(err)) + '. Please try again.');
+  }
+}
+
+window.deleteTicket = async function(id) {
+  if (!confirm('Delete this ticket? This cannot be undone.')) return;
+  await deleteDoc(doc(db, 'transportTickets', id));
+}
+
+// Quick inline toggle for Booked / Paid / Sent-to-partner directly in the list — the main day-to-day
+// action — no need to open the edit modal just for this. Booked and Sent each stamp their own
+// date/who; Paid has no auto-stamp since Payment Due Date is the separate, manually-set field.
+window.toggleTicketFlag = async function(id, field) {
+  const t = transportTickets.find(x => x.id === id);
+  if (!t) return;
+  const next = !t[field];
+  const update = { ...t, [field]: next };
+  if (field === 'booked') {
+    update.bookedDate = next ? new Date().toISOString().split('T')[0] : '';
+  } else if (field === 'sentToPartner') {
+    update.sentDate = next ? new Date().toISOString().split('T')[0] : '';
+    update.sentBy = next ? (myAgentName() || currentUserName) : '';
+  }
+  try {
+    await setDoc(doc(db, 'transportTickets', id), update);
+  } catch (err) {
+    console.error('toggleTicketFlag failed:', err);
+    alert('Could not save this change: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
+window.renderTransportTab = function(type) {
+  const listEl = document.getElementById(type + 'List');
+  const emptyEl = document.getElementById(type + 'Empty');
+  if (!listEl) return;
+  const searchEl = document.getElementById(type + 'Search');
+  const q = (searchEl ? searchEl.value : '').toLowerCase();
+  const showCancelledEl = document.getElementById(type + 'ShowCancelled');
+  const showCancelled = showCancelledEl ? showCancelledEl.checked : false;
+  refreshTicketAgentFilterOptions(type);
+  const agentFilterEl = document.getElementById(type + 'AgentFilter');
+  const agentFilter = agentFilterEl ? agentFilterEl.value : '';
+  const filter = transportFilterState[type] || 'all';
+  const todayStr = thailandTodayStr();
+
+  let list = transportTickets.filter(t => t.type === type);
+  if (!showCancelled) list = list.filter(t => !t.cancelled);
+  if (agentFilter) list = list.filter(t => (t.agent||'') === agentFilter);
+  if (q) list = list.filter(t => `${t.guest||''} ${t.bookingRef||''} ${t.from||''} ${t.to||''} ${t.partnerName||''}`.toLowerCase().includes(q));
+
+  if (filter === 'notbooked') list = list.filter(t => !t.booked);
+  else if (filter === 'notsent') list = list.filter(t => !t.sentToPartner);
+  else if (filter === 'next7') {
+    const in7 = addDaysToDateStr(todayStr, 7);
+    list = list.filter(t => t.departureDate && t.departureDate >= todayStr && t.departureDate <= in7);
+  } else if (filter === 'history') {
+    list = list.filter(t => t.departureDate && t.departureDate < todayStr);
+  } else {
+    // 'all' = Upcoming (default): today or later, or no date set yet — older trips move to History.
+    list = list.filter(t => !t.departureDate || t.departureDate >= todayStr);
+  }
+
+  // Soonest date first — an entry with no date yet sorts to the bottom rather than the top.
+  list.sort((a,b) => (a.departureDate || '9999-99-99').localeCompare(b.departureDate || '9999-99-99'));
+
+  if (list.length === 0) { listEl.innerHTML = ''; if (emptyEl) emptyEl.style.display = 'block'; return; }
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const isTrain = type === 'train';
+  listEl.innerHTML = `<div style="overflow-x:auto"><table class="hotels-table" style="min-width:1050px">
+    <tr>
+      <th>Departure</th><th>Guest</th><th>Route</th><th>Pax</th><th>Booking ref</th><th>Partner</th><th>Agent</th>
+      ${isTrain ? '<th>Train No.</th>' : ''}
+      <th>Booked</th><th>Paid</th><th>Sent</th><th></th>
+    </tr>
+    ${list.map(t => {
+      const overdue = t.departureDate && t.departureDate < todayStr && !t.booked && !t.cancelled;
+      const followupDue = !t.booked && t.followUpDate && t.followUpDate <= todayStr && !t.cancelled;
+      const styles = [];
+      if (t.cancelled) styles.push('opacity:0.5', 'text-decoration:line-through');
+      else if (overdue) styles.push('background:#fef3e2');
+      const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
+      const depLabel = formatTicketDate(t.departureDate) + (t.departureTime ? ' ' + t.departureTime : '');
+      const paxLabel = (t.adults != null) ? (t.adults + ((t.childrenAges && t.childrenAges.length) ? '+' + t.childrenAges.length + 'C' : '')) : '—';
+      return `<tr${styleAttr}>
+        <td>${esc(depLabel)}${followupDue ? ' <span class="badge b-pending" style="font-size:10px">follow-up due</span>' : ''}</td>
+        <td>${esc(t.guest||'—')}</td>
+        <td>${esc(t.from||'—')} → ${esc(t.to||'—')}</td>
+        <td>${esc(paxLabel)}</td>
+        <td>${esc(t.bookingRef||'—')}</td>
+        <td>${esc(t.partnerName||'—')}</td>
+        <td>${esc(t.agent||'—')}</td>
+        ${isTrain ? `<td>${esc(t.vehicleNo||'—')}</td>` : ''}
+        <td onclick="event.stopPropagation()"><input type="checkbox" ${t.booked?'checked':''} onchange="toggleTicketFlag('${t.id}','booked')"></td>
+        <td onclick="event.stopPropagation()"><input type="checkbox" ${t.paid?'checked':''} onchange="toggleTicketFlag('${t.id}','paid')"></td>
+        <td onclick="event.stopPropagation()"><input type="checkbox" ${t.sentToPartner?'checked':''} onchange="toggleTicketFlag('${t.id}','sentToPartner')"></td>
+        <td style="white-space:nowrap">
+          <button class="icon-btn" onclick='openTicketModal("${type}", ${JSON.stringify(t).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i></button>
+          <button class="icon-btn" onclick="deleteTicket('${t.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
+        </td>
+      </tr>`;
+    }).join('')}
+  </table></div>`;
 }
 </script>
 </body>
