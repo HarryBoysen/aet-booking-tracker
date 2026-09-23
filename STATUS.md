@@ -1,4 +1,4 @@
-[STATUS.md](https://github.com/user-attachments/files/32411818/STATUS.md)
+[Uploading STATUS.md…]()
 [STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
@@ -112,6 +112,78 @@ Harry rapporterede: ændrede check-out-dato på booking 35851 ("Golden Beach Res
 - Retter IKKE i sig selv årsagen til Harrys konkrete problem (den kender jeg stadig ikke, uden adgang til jeres rigtige data) — men gør fremtidige mislykkede gemninger synlige i stedet for stille, så det kan diagnosticeres med det samme.
 - Testet (Playwright, ny `test_save_error_visible.js` + fuld regressionssuite på 21 testscripts — ingen regressioner): en simuleret mislykket gemning viser nu fejlbeskeden i modalen i stedet for at lukke stille ned.
 - **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav). Afventer desuden Harrys faktiske fejltekst fra browser-konsollen for at finde selve root cause.**
+
+## Lomprayah Tickets + Train Tickets – to nye faner, REVIDERET 2026-09-23 – bygget og testet, AFVENTER Harrys godkendelse
+Første udkast blev sendt til Harry som preview (2026-09-23); han svarede med 6 konkrete forbedringspunkter, som er implementeret. Hans stand-ud prioritet var: "booking-tilknytning, opfølgning i My Action List og billetvedhæftning". Billetvedhæftning blev efterfølgende fravalgt igen (se note nederst) — de to andre prioriteter er med.
+
+- **1. Booking-tilknytning**: nyt felt "Booking" øverst i formularen — et **søgbart tekstfelt** (ikke en dropdown-liste, som ville være ubrugelig med flere hundrede bookinger). Skriv et bookingnummer eller gæstenavn, og browseren viser matchende forslag live; vælg ét og Gæst + Partner udfyldes automatisk OG låses (gråt, kan ikke rettes ved en fejl). Det manuelle "Booking Reference"-felt skjules til fordel for bookingens egen reference. **Inkluderer også arkiverede bookinger** (mærket "(Archived)" i søgeresultatet), da en billet stadig kan mangle at blive booket selvom hotel-bookingen allerede er arkiveret. Én booking kan sagtens have flere billetter (flere færge-/tog-ben) — det er bare flere billetter der peger på samme booking-id. Ryd feltet igen for at låse Gæst/Partner op og udfylde dem frit (til grupper uden en oprettet booking endnu).
+- **2. Booking Opens + Follow-up Date**: to nye datofelter. "Booking Opens" er informativt (rejsen kan ikkes bookes før denne dato). "Follow-up Date" er den der driver "My Action List" — en billet dukker automatisk op under en ny sektion "Transport tickets to book" i den ansvarlige agents Action List fra og med denne dato, indtil billetten markeres Booked. Ingen fast regel for alle billetter — datoen sættes manuelt pr. billet, præcis som Harry bad om. Rød/gul severity efter hvor tæt afrejsen er (≤3 dage = rød).
+- **3. Booking/betaling/afsendelse adskilt**: Booked, Paid og Sent to partner er nu tre uafhængige afkrydsningsfelter (både i modalen og direkte i listen) — hver med sin egen stempling. Sent to partner gemmer nu også HVEM der sendte (agentnavn) og hvornår, ikke kun ja/nej. Payment Due Date er sit eget datofelt, ikke bundet til om Paid er sat.
+- **4. Rigtige billetdetaljer**: nyt felt Ticket No(s). (fritekst, flere billetnumre kan skrives i ét felt). For tog: også Wagon (Vogn) og Seat/Berth (Plads/køje), skjult på Lomprayah-fanen. (Selve filvedhæftningen af billetten er IKKE med — se note nederst.)
+- **5. Klarere datoer og pax**: Departure/Arrival er nu splittet i egne dato- OG tidsfelter (Arrival Date er separat, til overnatningstog — defaulter til samme dato som afrejse, men kan ændres). Datoer vises i listen som "11 Jan 2027" (dag måned år udskrevet), så dag/måned aldrig kan forveksles. Adults og Children (med alder pr. barn) er separate felter i stedet for ét fritekstfelt, med automatisk sum ("Total pax: 4") vist live.
+- **6. Listen som arbejdsoverblik**: filterknapper tilføjet — **Upcoming** (standard: i dag eller senere), **Not booked**, **Not sent**, **Next 7 days**, **History** (alt før i dag). Plus en "ansvarlig agent"-dropdown til at filtrere listen. Ældre ture forsvinder automatisk fra standardvisningen til History, i stedet for at rode den daglige liste til.
+- **Lille rettelse**: Train-fanens eksempeltekst i Fra/Til viser nu togstationer ("Chiang Mai"/"Bangkok") i stedet for den gamle "Koh Samui Pier"-færgeplaceholder.
+- **Fravalgt igen (2026-09-23)**: billetvedhæftning (upload af PDF/billede) blev først bygget via Firebase Storage, men Harry vurderede at de ikke har brug for det — fjernet helt igen (ingen Storage-import, intet upload-felt, ingen `attachmentName`/`attachmentUrl` på billet-dokumentet). Det betyder også at Blaze-plan-opgraderingen IKKE er nødvendig for denne funktion længere — kun for den separate, endnu ikke godkendte e-mail-påmindelses-funktion nedenfor, hvis/når den bygges.
+- **Ikke bygget i denne runde**: en egentlig import-guide fra de gamle Excel-ark med gennemgang af usikre/tvetydige linjer (Harry nævnte dette som "vigtigt tjek ved import", men det lå uden for hans top-prioritet). Hvis I ønsker de gamle Excel-data migreret i bulk til trackeren, kan det bygges som en separat, isoleret funktion — sig til.
+- Begge faner deler stadig samme Firestore-collection (`transportTickets`, med et `type`-felt) og samme kode.
+- Testet (Playwright, `test_transport_tickets.js` omskrevet fra bunden + fuld regressionssuite på 22 testscripts — ingen regressioner): booking-tilknytning udfylder og låser Gæst/Partner korrekt, adults+children-sum beregnes live, Arrival Date defaulter til Departure Date, Booked/Paid/Sent er uafhængige og stempler korrekt (inkl. hvem der sendte), alle fire filtre + agent-filter + Upcoming/History-opdeling virker, og "Transport tickets to book" dukker korrekt op i My Action List (med "Mark booked"-genvej der fjerner den igen).
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Fælles team-note på forsiden (My Action List) – bygget og testet, AFVENTER Harrys godkendelse
+Harry spurgte om man kan skrive en note der kan ses på forsiden. Afklaret: alle medarbejdere skal kunne skrive/redigere, og det skal være ÉN fælles note (ikke en liste af flere) — overskrives når nogen ændrer den.
+
+- Ny boks øverst på "My Action List"-fanen (appens forside efter login). Er der ingen note, vises kun en lille "+ Add a note for the team"-knap — fylder intet når den ikke bruges. Er der en note, vises den med gul baggrund + hvem der sidst skrev den + dato ("Harry · 2026-09-23"), og en rediger-knap i hjørnet.
+- Alle logget-ind medarbejdere kan skrive/redigere/rydde noten — ikke admin-only, som Harry bad om. Gemning overskriver hele noten (ikke en log/liste) — helt bevidst, for at holde det simpelt som en whiteboard-besked.
+- Gemt i Firestore som ét dokument (`settings/teamNote`: `{text, updatedBy, updatedDate}`), samme collection som de eksisterende follow-up-tærskler bruger — ingen ny collection eller regelændring nødvendig.
+- Testet (Playwright, ny `test_team_note.js` + fuld regressionssuite på 23 testscripts — ingen regressioner): tom tilstand viser kun tilføj-knappen, gemt note viser tekst + forfatter + dato, redigering forudfylder den eksisterende tekst, Cancel gemmer intet, at gemme igen overskriver hele noten (ikke tilføjer), Clear rydder den tilbage til tom tilstand for alle.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Notes-kolonne direkte i Lomprayah/Train Tickets-listen – bygget og testet, AFVENTER Harrys godkendelse
+Harry bekræftede at billettrackeren virker live, og bad om at kunne skrive en kort bemærkning direkte på hver linje i listen (fx "Can book to Nov"), uden at skulle åbne redigeringsvinduet.
+
+- Ny "Notes"-kolonne i tabellen på både Lomprayah- og Train-fanen, mellem "Sent" og redigér/slet-knapperne — et almindeligt tekstfelt man kan skrive direkte i. Gemmes automatisk når man forlader feltet (samme mønster som de eksisterende Booked/Paid/Sent-afkrydsningsfelter i listen — ingen "Save"-knap nødvendig).
+- Genbruger billettens eksisterende `notes`-felt (det samme som "Notes"-feltet nederst i redigeringsvinduet) — det er altså IKKE et nyt, separat felt; skriver man i kolonnen, opdateres den samme note man også ser hvis man åbner billetten.
+- Testet (Playwright, `test_transport_tickets.js` udvidet + fuld regressionssuite på 23 testscripts — ingen regressioner): Notes-kolonnen vises på begge faner, tekst skrevet direkte i en række gemmes og overlever en genindlæsning af listen.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Mere kompakt Lomprayah/Train Tickets-liste – bygget og testet, AFVENTER Harrys godkendelse
+Harry bad om tre justeringer af listevisningen efter Notes-kolonnen: alt skal stå på én linje (evt. mindre tekst), "Paid" fjernes fra listen for at give plads, og der skal være en tydeligere streg mellem hver booking.
+
+- Skriftstørrelsen i selve billet-tabellen er sat ned (fra 13px til 12px), og hver celle får `white-space:nowrap` så indholdet ikke længere kan brække over flere linjer — hver booking fylder nu præcis én række.
+- "Paid"-kolonnen (afkrydsningsfelt) er fjernet fra listevisningen på begge faner for at give mere plads til de andre kolonner. Selve "betalt"-status er ikke fjernet fra systemet — den kan stadig ses og redigeres inde i billetten (rediger-ikonet), kun den hurtige afkrydsning direkte i listen er væk.
+- Streg mellem hver linje er gjort tydeligere (fra en meget svag streg til en klart synlig grå streg), så det er lettere at se hvor én booking slutter og den næste starter.
+- Disse ændringer påvirker kun selve billet-tabellen (Lomprayah/Train Tickets) — andre tabeller i systemet (fx Response Stats) ser ud som før.
+- Testet (Playwright, `test_transport_tickets.js` opdateret + fuld regressionssuite på 23 testscripts — ingen regressioner).
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Den "skubbende" linje i bunden af tabellen – rettet, AFVENTER Harrys godkendelse
+Harry sendte et screenshot og spurgte hvorfor der er en grå "skubbe"-linje i bunden af Lomprayah/Train Tickets-tabellen. Det var den vandrette scrollbar til tabellen — den kom fordi tabellen var sat til en fast minimumsbredde (1150px), som var lige akkurat bredere end det tilgængelige plads på siden, så scrollbaren altid var synlig, selv når det ikke var nødvendigt (særligt på Lomprayah-fanen, som har én kolonne mindre end Train og derfor slet ikke behøvede den bredde).
+
+- Fjernet den faste minimumsbredde — tabellen fylder nu kun så meget plads som kolonnerne rent faktisk fylder, i stedet for at blive tvunget bredere end nødvendigt.
+- Gjort "Notes"-feltet lidt smallere (170px → 150px) for at give ekstra luft.
+- Scrollbaren er stadig der som sikkerhedsnet på meget smalle skærme/vinduer, men er nu tynd og diskret i stedet for den brede, grå bjælke fra før — og vises kun når den faktisk er nødvendig.
+- Testet (Playwright, ny `test_ticket_multiroute_and_scroll.js`): tabellen kræver ikke vandret scroll på en normal bærbar-bredde, hverken på Lomprayah- eller Train-fanen. Fuld regressionssuite på 24 testscripts — ingen regressioner.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Flere ruter pr. booking i Lomprayah Tickets – bygget og testet, AFVENTER Harrys godkendelse
+Harry påpegede at der typisk er 2-3 Lomprayah-ruter pr. kunde (fx ø-til-ø, så videre til fastlandet), og bad om en måde at oprette flere ruter pr. booking uden besvær.
+
+- Ny knap "Save & add another route" i redigeringsvinduet for Lomprayah-billetter (vises kun for Lomprayah, ikke Train, da tog normalt kun er én strækning). Knappen gemmer den aktuelle rute som sin egen billet-linje, men holder vinduet åbent og beholder booking, gæstenavn, partner, agent og antal personer — kun rute/dato/tid/status/billetdetaljer nulstilles, så man straks kan skrive den næste rute ind.
+- Hver rute gemmes fortsat som sin egen linje i listen (som i dag), så Booked/Sent/Notes stadig kan følges rute for rute — det er kun *indtastningen* der er blevet hurtigere, ikke selve datastrukturen.
+- En grøn bekræftelse ("Route saved. Enter the next route below...") vises i vinduet efter hver gemt rute, så det er tydeligt at det virkede.
+- Almindelig "Save Ticket"-knap virker som altid og lukker vinduet efter sidste rute.
+- Testet (Playwright, ny `test_ticket_multiroute_and_scroll.js`): opretter 2 ekstra ruter for samme booking via "Save & add another route", bekræfter at booking/gæst/booking ref er ens på alle 3 linjer, og at knappen er skjult for Train-billetter. Fuld regressionssuite på 24 testscripts — ingen regressioner.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## Notes-feltet er nu en ren hvid boks + ruter samlet i én boks pr. kunde – bygget og testet, AFVENTER Harrys godkendelse
+To justeringer efter forrige runde: (1) eksempel-teksten "e.g. Can book to Nov" i Notes-feltet skulle væk, så det bare er en almindelig hvid boks. (2) Når samme kunde/booking har flere Lomprayah-ruter, skal de ligge samlet i én boks — samme princip som når en booking har flere hoteller på Bookings-fanen (én kort/boks pr. booking, med hver hotel som en linje inde i boksen).
+
+- Notes-feltet i listen viser ikke længere eksempel-tekst — det er nu bare en tom, hvid boks man kan skrive direkte i (gælder både Lomprayah og Train).
+- Lomprayah Tickets-fanen viser nu én boks pr. kunde/booking (samme visuelle stil som en booking-boks på Bookings-fanen — hvid kasse med afrundede hjørner). Bookingnummer, gæstenavn, antal personer, agent og partner står én gang i boksens "header" i stedet for at blive gentaget på hver linje. Inde i boksen er hver rute sin egen linje med Afgang, Rute, Booked, Sent og Notes — præcis som Booked/Paid/Sent er styret rute for rute i dag. Har kunden 2+ ruter, viser boksen fx "2 routes" i headeren, så det er tydeligt der er flere.
+- Ruter grupperes efter den bookingen de er linket til; er en billet ikke linket til en booking, grupperes den efter gæstenavn i stedet (samme kunde skrevet med samme navn havner stadig i samme boks).
+- Train Tickets-fanen er IKKE ændret — den viser stadig én flad liste, da tog normalt kun har én strækning pr. kunde.
+- Testet (Playwright, `test_ticket_multiroute_and_scroll.js` udvidet): opretter en kunde med 3 ruter og bekræfter de vises i ÉN boks (ikke 3 separate), at boksen nævner "3 routes", og at Notes-feltet ikke har eksempel-tekst. Fuld regressionssuite på 25 testscripts — ingen regressioner.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
 
 ## Åbent spørgsmål (afventer svar)
 - Sold-Out Calendar-artifact (separat værktøj, ikke denne tracker): forslag om at tilføje en note under "Allotment Availability" om at et hotels STOP SALE report betyder tabt allotment, selvom en tip stadig viser grøn. Ikke lagt ind endnu – afventer "ja/nej".
