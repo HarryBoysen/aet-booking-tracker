@@ -56,12 +56,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .hotels-table tr:last-child td{border-bottom:none}
 .hotels-table tr:hover td{background:#fafaf8}
 .hotel-alert td{background:#fff8f8}
-.ticket-note-input{width:170px;font-size:12px;border:0.5px solid #ddd;border-radius:6px;padding:5px 8px;font-family:inherit}
+.ticket-note-input{width:150px;font-size:12px;border:0.5px solid #ddd;border-radius:6px;padding:5px 8px;font-family:inherit}
 .ticket-note-input:focus{border-color:#999;outline:none}
-.ticket-table{font-size:12px}
-.ticket-table th{padding:6px 10px;white-space:nowrap}
-.ticket-table td{padding:6px 10px;white-space:nowrap;border-bottom:1px solid #e6e6e1}
+.ticket-table{font-size:12px;width:auto}
+.ticket-table th{padding:6px 8px;white-space:nowrap}
+.ticket-table td{padding:6px 8px;white-space:nowrap;border-bottom:1px solid #e6e6e1}
 .ticket-table tr:last-child td{border-bottom:none}
+.ticket-table-scroll{overflow-x:auto;scrollbar-width:thin}
+.ticket-table-scroll::-webkit-scrollbar{height:6px}
+.ticket-table-scroll::-webkit-scrollbar-thumb{background:#ddd;border-radius:3px}
+.ticket-table-scroll::-webkit-scrollbar-track{background:transparent}
 .badge{display:inline-block;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
 .b-pending{background:#fef3e2;color:#7a4a00}
 .b-alert{background:#fce8e8;color:#a32d2d}
@@ -456,6 +460,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 <div class="modal wide">
   <h2 id="ticketModalTitle">New Ticket</h2>
   <div id="ticketFormError" class="field-error-msg" style="display:none;margin-bottom:12px;font-size:13px"></div>
+  <div id="ticketRouteAddedMsg" style="display:none;margin-bottom:12px;font-size:13px;color:#1a7a3c;background:#eafaf0;border:0.5px solid #b8e6c8;border-radius:6px;padding:8px 12px"></div>
 
   <div class="section-divider">Booking</div>
   <div class="row3">
@@ -524,6 +529,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
   <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:#a33"><input type="checkbox" id="tk-cancelled"> Cancelled</label>
   <div class="modal-footer">
     <button class="btn" onclick="closeModal('ticketModal')">Cancel</button>
+    <button class="btn" id="tk-addroute-btn" style="display:none" onclick="saveTicketAndAddRoute()">Save &amp; add another route</button>
     <button class="btn primary" onclick="saveTicket()">Save Ticket</button>
   </div>
 </div>
@@ -3708,7 +3714,12 @@ window.openTicketModal = function(type, ticket) {
   ticketChildrenAges = (ticket && Array.isArray(ticket.childrenAges)) ? ticket.childrenAges.slice() : [];
 
   document.getElementById('ticketFormError').style.display = 'none';
+  document.getElementById('ticketRouteAddedMsg').style.display = 'none';
   document.getElementById('ticketModalTitle').textContent = (ticket ? 'Edit ' : 'New ') + (isTrain ? 'Train Ticket' : 'Lomprayah Ticket');
+  // Lomprayah bookings often need 2-3 separate routes per customer — this button saves the current
+  // route and keeps the modal open with booking/guest/partner/agent/pax carried over, so the next
+  // route can be entered without retyping the shared details. Not offered for Train (one leg is the norm).
+  document.getElementById('tk-addroute-btn').style.display = isTrain ? 'none' : '';
 
   refreshTicketBookingSelect();
   refreshTicketPartnerDropdown();
@@ -3763,12 +3774,16 @@ window.openTicketModal = function(type, ticket) {
   document.getElementById('ticketModal').classList.add('open');
 }
 
-window.saveTicket = async function() {
+// Shared save logic for both "Save Ticket" (closes the modal) and "Save & add another route"
+// (keeps it open for the next Lomprayah leg). Returns true on success, false on validation/save failure —
+// callers decide what to do next rather than this function closing the modal itself.
+async function saveTicketCore() {
   const guest = document.getElementById('tk-guest').value.trim();
   const depDate = document.getElementById('tk-depdate').value;
   document.getElementById('ticketFormError').style.display = 'none';
-  if (!guest) { showTicketFormError('Guest / group name is required.'); return; }
-  if (!depDate) { showTicketFormError('Departure date is required.'); return; }
+  document.getElementById('ticketRouteAddedMsg').style.display = 'none';
+  if (!guest) { showTicketFormError('Guest / group name is required.'); return false; }
+  if (!depDate) { showTicketFormError('Departure date is required.'); return false; }
 
   // Re-resolve from the current search-box text rather than trusting stale state, in case the field
   // was edited without triggering a change event (e.g. browser autofill).
@@ -3829,11 +3844,54 @@ window.saveTicket = async function() {
   };
   try {
     await setDoc(doc(db, 'transportTickets', ticket.id), ticket);
-    window.closeModal('ticketModal');
+    return true;
   } catch (err) {
     console.error('saveTicket failed:', err);
     showTicketFormError('Could not save: ' + (err && err.message ? err.message : String(err)) + '. Please try again.');
+    return false;
   }
+}
+
+window.saveTicket = async function() {
+  const ok = await saveTicketCore();
+  if (ok) window.closeModal('ticketModal');
+}
+
+// "Save & add another route" — Lomprayah bookings often need 2-3 separate routes per customer.
+// Saves the current route as its own ticket document, then clears only the route/timing/status/
+// ticket-detail fields and keeps booking, guest, partner, agent and pax as-is, ready for the next leg.
+window.saveTicketAndAddRoute = async function() {
+  const ok = await saveTicketCore();
+  if (!ok) return;
+
+  editingTicketId = null; // next Save creates a new ticket document rather than overwriting this one
+
+  document.getElementById('tk-from').value = '';
+  document.getElementById('tk-to').value = '';
+  document.getElementById('tk-depdate').value = '';
+  document.getElementById('tk-deptime').value = '';
+  document.getElementById('tk-arrdate').value = '';
+  document.getElementById('tk-arrtime').value = '';
+  document.getElementById('tk-vehicleno').value = '';
+  document.getElementById('tk-class').value = '';
+  document.getElementById('tk-opensdate').value = '';
+  document.getElementById('tk-followupdate').value = '';
+  document.getElementById('tk-booked').checked = false;
+  document.getElementById('tk-paid').checked = false;
+  document.getElementById('tk-paymentdue').value = '';
+  document.getElementById('tk-sent').checked = false;
+  renderTicketSentByNote();
+  document.getElementById('tk-ticketnos').value = '';
+  document.getElementById('tk-invoiceno').value = '';
+  document.getElementById('tk-price').value = '';
+  document.getElementById('tk-notes').value = '';
+  document.getElementById('tk-cancelled').checked = false;
+
+  document.getElementById('ticketModalTitle').textContent = 'New Lomprayah Ticket — next route';
+  const msgEl = document.getElementById('ticketRouteAddedMsg');
+  msgEl.textContent = 'Route saved. Enter the next route below, or click "Save Ticket" when you\'re done.';
+  msgEl.style.display = '';
+  document.getElementById('tk-from').focus();
 }
 
 window.deleteTicket = async function(id) {
@@ -3917,7 +3975,7 @@ window.renderTransportTab = function(type) {
   if (emptyEl) emptyEl.style.display = 'none';
 
   const isTrain = type === 'train';
-  listEl.innerHTML = `<div style="overflow-x:auto"><table class="hotels-table ticket-table" style="min-width:1150px">
+  listEl.innerHTML = `<div class="ticket-table-scroll"><table class="hotels-table ticket-table">
     <tr>
       <th>Departure</th><th>Guest</th><th>Route</th><th>Pax</th><th>Booking ref</th><th>Partner</th><th>Agent</th>
       ${isTrain ? '<th>Train No.</th>' : ''}
