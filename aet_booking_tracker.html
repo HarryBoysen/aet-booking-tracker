@@ -452,7 +452,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <div class="section-divider">Booking</div>
   <div class="row3">
-    <div class="field"><label>Booking</label><select id="tk-booking" onchange="onTicketBookingChange()"><option value="">— Not linked to a booking yet —</option></select></div>
+    <div class="field"><label>Booking <span style="font-weight:400;color:#aaa">(type a booking number or guest name to search)</span></label><input id="tk-booking" list="ticketBookingOptions" placeholder="— Not linked to a booking yet — start typing to search" autocomplete="off" oninput="onTicketBookingChange()"></div>
     <div class="field"><label>Guest / Group Name</label><input id="tk-guest" placeholder="Guest or group name"></div>
     <div class="field"><label>Partner</label><select id="tk-partner"><option value="">— None —</option></select></div>
   </div>
@@ -695,6 +695,8 @@ let editingTicketId = null;
 let editingTicketType = 'lomprayah'; // which tab a new ticket is being added from
 let ticketChildrenAges = [];
 let transportFilterState = { lomprayah: 'all', train: 'all' };
+let ticketBookingLabelMap = {}; // exact "ref — guest" search-box text -> booking id, rebuilt on every modal open
+let ticketLinkedBookingId = ''; // resolved from the current text in #tk-booking; '' means not linked
 
 // Nothing is fetched or shown until Firebase confirms the sign-in state.
 let appStarted = false;
@@ -3499,14 +3501,22 @@ function refreshTicketPartnerDropdown() {
   if (!sel) return;
   sel.innerHTML = '<option value="">— None —</option>' + partners.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
 }
-// One booking can have several ferry/train legs, so this is a plain dropdown of open bookings, not
-// tied one-to-one to a ticket — picking one just pre-fills this ticket from it.
+// One booking can have several ferry/train legs, so this is a searchable text field over ALL
+// bookings (including archived — a train ticket can still need booking for a trip whose hotel
+// booking has since been archived), not tied one-to-one to a ticket. A plain <select> becomes
+// unusable once there are several hundred bookings, so this is a text input + datalist instead:
+// type a booking number or guest name and the browser filters the suggestions live. Picking one
+// (or typing the exact "ref — guest" text) resolves via ticketBookingLabelMap and pre-fills the
+// ticket from it.
+function ticketBookingLabel(b) {
+  return `${b.ref || '—'} — ${b.guest || '—'}${b.archived ? ' (Archived)' : ''}`;
+}
 function refreshTicketBookingSelect() {
-  const sel = document.getElementById('tk-booking');
-  if (!sel) return;
-  const list = bookings.filter(b => !b.archived).slice().sort((a,b2) => (a.ref||'').localeCompare(b2.ref||''));
-  sel.innerHTML = '<option value="">— Not linked to a booking yet —</option>' +
-    list.map(b => `<option value="${esc(b.id)}">${esc(b.ref||'—')} — ${esc(b.guest||'—')}</option>`).join('');
+  const dl = ensureDatalist('ticketBookingOptions');
+  const list = bookings.slice().sort((a,b2) => (a.ref||'').localeCompare(b2.ref||''));
+  ticketBookingLabelMap = {};
+  list.forEach(b => { ticketBookingLabelMap[ticketBookingLabel(b)] = b.id; });
+  dl.innerHTML = list.map(b => `<option value="${esc(ticketBookingLabel(b))}">`).join('');
 }
 function showTicketFormError(msg) {
   const el = document.getElementById('ticketFormError');
@@ -3516,11 +3526,16 @@ function showTicketFormError(msg) {
 }
 
 // Linking a booking auto-fills + locks Guest/Partner (so they can only ever match the booking) and
-// hides the manual booking-ref field in favour of the booking's own ref; choosing "— Not linked —"
-// reverts both to free text. Responsible Agent is pre-filled from the booking too, but stays
-// editable, since who handles a given leg can differ from who owns the booking.
+// hides the manual booking-ref field in favour of the booking's own ref; clearing the search box
+// (or typing something that doesn't exactly match a suggestion) reverts both to free text. The typed
+// text only counts as "linked" once it exactly matches a known "ref — guest" label — resolved via
+// ticketBookingLabelMap, built fresh by refreshTicketBookingSelect() on every modal open. Responsible
+// Agent is pre-filled from the booking too, but stays editable, since who handles a given leg can
+// differ from who owns the booking.
 window.onTicketBookingChange = function() {
-  const bookingId = document.getElementById('tk-booking').value;
+  const typed = document.getElementById('tk-booking').value.trim();
+  const bookingId = typed ? (ticketBookingLabelMap[typed] || '') : '';
+  ticketLinkedBookingId = bookingId;
   const guestEl = document.getElementById('tk-guest');
   const partnerEl = document.getElementById('tk-partner');
   const agentEl = document.getElementById('tk-agent');
@@ -3627,7 +3642,8 @@ window.openTicketModal = function(type, ticket) {
   refreshTicketPartnerDropdown();
   refreshTicketBookingRefSuggestions();
 
-  document.getElementById('tk-booking').value = ticket ? (ticket.bookingId||'') : '';
+  const linkedBookingForEdit = (ticket && ticket.bookingId) ? bookings.find(b => b.id === ticket.bookingId) : null;
+  document.getElementById('tk-booking').value = linkedBookingForEdit ? ticketBookingLabel(linkedBookingForEdit) : '';
   document.getElementById('tk-guest').value = ticket ? (ticket.guest||'') : '';
   document.getElementById('tk-partner').value = ticket ? (ticket.partnerId||'') : '';
   document.getElementById('tk-agent').value = ticket ? (ticket.agent||'') : '';
@@ -3682,7 +3698,10 @@ window.saveTicket = async function() {
   if (!guest) { showTicketFormError('Guest / group name is required.'); return; }
   if (!depDate) { showTicketFormError('Departure date is required.'); return; }
 
-  const bookingId = document.getElementById('tk-booking').value;
+  // Re-resolve from the current search-box text rather than trusting stale state, in case the field
+  // was edited without triggering a change event (e.g. browser autofill).
+  const typedBooking = document.getElementById('tk-booking').value.trim();
+  const bookingId = typedBooking ? (ticketBookingLabelMap[typedBooking] || '') : '';
   const linkedBooking = bookingId ? bookings.find(b => b.id === bookingId) : null;
   const partnerId = document.getElementById('tk-partner').value;
   const partnerName = partnerId ? (partners.find(p=>p.id===partnerId)||{}).name || '' : '';
