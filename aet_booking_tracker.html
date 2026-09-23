@@ -3937,6 +3937,61 @@ window.updateTicketNotes = async function(id, value) {
   }
 }
 
+// Shared per-route display bits (overdue/follow-up styling, departure label) used by both the
+// Train tab's flat table and the Lomprayah tab's grouped-card rows below.
+function ticketRowMeta(t, todayStr) {
+  const overdue = t.departureDate && t.departureDate < todayStr && !t.booked && !t.cancelled;
+  const followupDue = !t.booked && t.followUpDate && t.followUpDate <= todayStr && !t.cancelled;
+  const styles = [];
+  if (t.cancelled) styles.push('opacity:0.5', 'text-decoration:line-through');
+  else if (overdue) styles.push('background:#fef3e2');
+  const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
+  const depLabel = formatTicketDate(t.departureDate) + (t.departureTime ? ' ' + t.departureTime : '');
+  return { styleAttr, depLabel, followupDue };
+}
+
+// One route's row inside a Lomprayah customer's grouped card — Guest/Pax/Booking ref/Partner/Agent
+// live once in the card header instead of repeating on every route, since those are shared across
+// all of a customer's routes.
+function ticketRouteRowHtml(t, todayStr) {
+  const meta = ticketRowMeta(t, todayStr);
+  return `<tr${meta.styleAttr}>
+    <td>${esc(meta.depLabel)}${meta.followupDue ? ' <span class="badge b-pending" style="font-size:10px">follow-up due</span>' : ''}</td>
+    <td>${esc(t.from||'—')} → ${esc(t.to||'—')}</td>
+    <td onclick="event.stopPropagation()"><input type="checkbox" ${t.booked?'checked':''} onchange="toggleTicketFlag('${t.id}','booked')"></td>
+    <td onclick="event.stopPropagation()"><input type="checkbox" ${t.sentToPartner?'checked':''} onchange="toggleTicketFlag('${t.id}','sentToPartner')"></td>
+    <td onclick="event.stopPropagation()"><input type="text" class="ticket-note-input" value="${esc(t.notes||'')}" onchange="updateTicketNotes('${t.id}', this.value)"></td>
+    <td style="white-space:nowrap">
+      <button class="icon-btn" onclick='openTicketModal("${t.type}", ${JSON.stringify(t).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i></button>
+      <button class="icon-btn" onclick="deleteTicket('${t.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
+    </td>
+  </tr>`;
+}
+
+// One ticket's row in the Train tab's flat table (unchanged layout — multi-leg journeys aren't the
+// norm for Train, so it isn't grouped into cards the way Lomprayah routes are).
+function ticketFlatRowHtml(t, todayStr) {
+  const meta = ticketRowMeta(t, todayStr);
+  const paxLabel = (t.adults != null) ? (t.adults + ((t.childrenAges && t.childrenAges.length) ? '+' + t.childrenAges.length + 'C' : '')) : '—';
+  return `<tr${meta.styleAttr}>
+    <td>${esc(meta.depLabel)}${meta.followupDue ? ' <span class="badge b-pending" style="font-size:10px">follow-up due</span>' : ''}</td>
+    <td>${esc(t.guest||'—')}</td>
+    <td>${esc(t.from||'—')} → ${esc(t.to||'—')}</td>
+    <td>${esc(paxLabel)}</td>
+    <td>${esc(t.bookingRef||'—')}</td>
+    <td>${esc(t.partnerName||'—')}</td>
+    <td>${esc(t.agent||'—')}</td>
+    <td>${esc(t.vehicleNo||'—')}</td>
+    <td onclick="event.stopPropagation()"><input type="checkbox" ${t.booked?'checked':''} onchange="toggleTicketFlag('${t.id}','booked')"></td>
+    <td onclick="event.stopPropagation()"><input type="checkbox" ${t.sentToPartner?'checked':''} onchange="toggleTicketFlag('${t.id}','sentToPartner')"></td>
+    <td onclick="event.stopPropagation()"><input type="text" class="ticket-note-input" value="${esc(t.notes||'')}" onchange="updateTicketNotes('${t.id}', this.value)"></td>
+    <td style="white-space:nowrap">
+      <button class="icon-btn" onclick='openTicketModal("${t.type}", ${JSON.stringify(t).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i></button>
+      <button class="icon-btn" onclick="deleteTicket('${t.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
+    </td>
+  </tr>`;
+}
+
 window.renderTransportTab = function(type) {
   const listEl = document.getElementById(type + 'List');
   const emptyEl = document.getElementById(type + 'Empty');
@@ -3975,40 +4030,52 @@ window.renderTransportTab = function(type) {
   if (emptyEl) emptyEl.style.display = 'none';
 
   const isTrain = type === 'train';
-  listEl.innerHTML = `<div class="ticket-table-scroll"><table class="hotels-table ticket-table">
-    <tr>
-      <th>Departure</th><th>Guest</th><th>Route</th><th>Pax</th><th>Booking ref</th><th>Partner</th><th>Agent</th>
-      ${isTrain ? '<th>Train No.</th>' : ''}
-      <th>Booked</th><th>Sent</th><th>Notes</th><th></th>
-    </tr>
-    ${list.map(t => {
-      const overdue = t.departureDate && t.departureDate < todayStr && !t.booked && !t.cancelled;
-      const followupDue = !t.booked && t.followUpDate && t.followUpDate <= todayStr && !t.cancelled;
-      const styles = [];
-      if (t.cancelled) styles.push('opacity:0.5', 'text-decoration:line-through');
-      else if (overdue) styles.push('background:#fef3e2');
-      const styleAttr = styles.length ? ` style="${styles.join(';')}"` : '';
-      const depLabel = formatTicketDate(t.departureDate) + (t.departureTime ? ' ' + t.departureTime : '');
-      const paxLabel = (t.adults != null) ? (t.adults + ((t.childrenAges && t.childrenAges.length) ? '+' + t.childrenAges.length + 'C' : '')) : '—';
-      return `<tr${styleAttr}>
-        <td>${esc(depLabel)}${followupDue ? ' <span class="badge b-pending" style="font-size:10px">follow-up due</span>' : ''}</td>
-        <td>${esc(t.guest||'—')}</td>
-        <td>${esc(t.from||'—')} → ${esc(t.to||'—')}</td>
-        <td>${esc(paxLabel)}</td>
-        <td>${esc(t.bookingRef||'—')}</td>
-        <td>${esc(t.partnerName||'—')}</td>
-        <td>${esc(t.agent||'—')}</td>
-        ${isTrain ? `<td>${esc(t.vehicleNo||'—')}</td>` : ''}
-        <td onclick="event.stopPropagation()"><input type="checkbox" ${t.booked?'checked':''} onchange="toggleTicketFlag('${t.id}','booked')"></td>
-        <td onclick="event.stopPropagation()"><input type="checkbox" ${t.sentToPartner?'checked':''} onchange="toggleTicketFlag('${t.id}','sentToPartner')"></td>
-        <td onclick="event.stopPropagation()"><input type="text" class="ticket-note-input" value="${esc(t.notes||'')}" placeholder="e.g. Can book to Nov" onchange="updateTicketNotes('${t.id}', this.value)"></td>
-        <td style="white-space:nowrap">
-          <button class="icon-btn" onclick='openTicketModal("${type}", ${JSON.stringify(t).replace(/'/g,"&#39;")})'><i class="ti ti-edit"></i></button>
-          <button class="icon-btn" onclick="deleteTicket('${t.id}')" style="color:#ddd"><i class="ti ti-trash"></i></button>
-        </td>
-      </tr>`;
-    }).join('')}
-  </table></div>`;
+
+  if (isTrain) {
+    listEl.innerHTML = `<div class="ticket-table-scroll"><table class="hotels-table ticket-table">
+      <tr>
+        <th>Departure</th><th>Guest</th><th>Route</th><th>Pax</th><th>Booking ref</th><th>Partner</th><th>Agent</th><th>Train No.</th>
+        <th>Booked</th><th>Sent</th><th>Notes</th><th></th>
+      </tr>
+      ${list.map(t => ticketFlatRowHtml(t, todayStr)).join('')}
+    </table></div>`;
+    return;
+  }
+
+  // Lomprayah: group a customer's routes into one box, the same way a booking's multiple hotels
+  // show as one card with a row per hotel on the Bookings tab — a Lomprayah booking typically has
+  // 2-3 routes (island-to-island, then on to the mainland) and they read much better together than
+  // as separate look-alike rows scattered through the list. Tickets linked to the same booking are
+  // grouped by bookingId; tickets with no linked booking fall back to grouping by guest name.
+  const groups = [];
+  const groupIndexByKey = {};
+  list.forEach(t => {
+    const key = t.bookingId ? ('b:' + t.bookingId) : ('g:' + (t.guest||'').trim().toLowerCase());
+    if (!(key in groupIndexByKey)) { groupIndexByKey[key] = groups.length; groups.push([]); }
+    groups[groupIndexByKey[key]].push(t);
+  });
+
+  listEl.innerHTML = groups.map(routes => {
+    const first = routes[0];
+    const paxLabel = (first.adults != null) ? (first.adults + ((first.childrenAges && first.childrenAges.length) ? '+' + first.childrenAges.length + 'C' : '')) : '—';
+    const partnerLabel = first.partnerName ? `<span style="font-size:11px;color:#1a7a55;background:#eafaf2;padding:2px 8px;border-radius:20px">${esc(first.partnerName)}</span>` : '';
+    return `<div class="booking-card" style="margin-bottom:10px">
+      <div class="card-header" style="cursor:default">
+        <div class="card-title">
+          <span class="card-ref">${esc(first.bookingRef||'—')}</span>
+          <span class="card-guest">${esc(first.guest||'—')}</span>
+          <span style="font-size:12px;color:#888">${esc(paxLabel)} pax</span>
+          <span class="card-agent">${esc(first.agent||'—')}</span>
+          ${partnerLabel}
+          ${routes.length > 1 ? `<span style="font-size:11px;color:#aaa">${routes.length} routes</span>` : ''}
+        </div>
+      </div>
+      <div class="card-body"><div class="ticket-table-scroll"><table class="hotels-table ticket-table">
+        <tr><th>Departure</th><th>Route</th><th>Booked</th><th>Sent</th><th>Notes</th><th></th></tr>
+        ${routes.map(t => ticketRouteRowHtml(t, todayStr)).join('')}
+      </table></div></div>
+    </div>`;
+  }).join('');
 }
 </script>
 </body>
