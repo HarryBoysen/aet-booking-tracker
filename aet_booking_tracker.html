@@ -205,6 +205,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 
   <!-- MY ACTION LIST TAB -->
   <div class="tab-panel active" id="panel-action">
+    <div id="teamNoteBox" style="margin-bottom:1rem"></div>
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:1rem">
       <div id="actionSummary" style="font-size:14px;color:#555"></div>
       <div id="actionViewToggle"></div>
@@ -672,6 +673,11 @@ let escalateContext = null; // {bookingId, hotelId} while the Escalate modal is 
 // Defaults below are used until/unless that doc exists.
 let followupSettings = { amberThresholdDays: 2, redThresholdDays: 4 };
 let duplicateOverrideContext = null; // {resolve} while the duplicate-warning modal is open
+// Firestore 'settings' collection, doc id 'teamNote': one shared note any logged-in team member can
+// write/edit, shown at the top of My Action List (the app's front page). Overwritten whole each
+// time someone saves — not a per-author log — per Harry's ask for something simple.
+let teamNote = { text: '', updatedBy: '', updatedDate: '' };
+let teamNoteEditing = false; // true while the note box is showing its textarea/Save/Cancel
 
 let editId = null;
 let currentFilter = 'all';
@@ -784,9 +790,12 @@ function startApp() {
         redThresholdDays: Number(data.redThresholdDays) || 4
       };
     }
+    const teamNoteDoc = snap.docs.find(d => d.id === 'teamNote');
+    teamNote = teamNoteDoc ? { text: '', updatedBy: '', updatedDate: '', ...teamNoteDoc.data() } : { text: '', updatedBy: '', updatedDate: '' };
     render();
     renderActionList();
     renderTeamList();
+    renderTeamNoteBox();
   });
   onSnapshot(collection(db, 'allotments'), (snap) => {
     allotments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -935,6 +944,63 @@ function isAdminViewer() {
 function hotelResponsibleAgent(b, h) {
   return ((h.assignedAgent || b.agent) || '').trim();
 }
+// A simple shared team note shown at the top of My Action List (the app's front page) — any logged-in
+// team member can write or edit it. There is deliberately only ever ONE note (Harry's explicit ask,
+// keeping this simple rather than a per-author log): saving replaces the whole thing, and the box
+// always shows who last changed it and when, so nobody has to guess if it's stale.
+function renderTeamNoteBox() {
+  const el = document.getElementById('teamNoteBox');
+  if (!el) return;
+  if (teamNoteEditing) {
+    el.innerHTML = `<div style="border:1px solid #ddd;border-radius:8px;padding:12px 14px;background:#fffbea">
+      <textarea id="teamNoteInput" style="width:100%;min-height:70px;font-family:inherit;font-size:14px;border:1px solid #ddd;border-radius:6px;padding:8px" placeholder="Write a note for the whole team — shows here for everyone until someone changes or clears it...">${esc(teamNote.text || '')}</textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn primary sm" onclick="saveTeamNote()"><i class="ti ti-check"></i> Save</button>
+        <button class="btn sm" onclick="cancelTeamNote()">Cancel</button>
+        ${teamNote.text ? `<button class="btn sm" style="margin-left:auto;color:#a33" onclick="clearTeamNote()"><i class="ti ti-trash"></i> Clear note</button>` : ''}
+      </div>
+    </div>`;
+    document.getElementById('teamNoteInput').focus();
+    return;
+  }
+  if (!teamNote.text) {
+    el.innerHTML = `<button class="btn sm" onclick="editTeamNote()"><i class="ti ti-note"></i> + Add a note for the team</button>`;
+    return;
+  }
+  const meta = [teamNote.updatedBy, teamNote.updatedDate].filter(Boolean).join(' · ');
+  el.innerHTML = `<div style="border:1px solid #f0dca0;border-radius:8px;padding:12px 14px;background:#fffbea;display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+    <div style="white-space:pre-wrap;font-size:14px;line-height:1.4">${esc(teamNote.text)}${meta ? `<div style="font-size:11px;color:#998;margin-top:6px">${esc(meta)}</div>` : ''}</div>
+    <button class="icon-btn" title="Edit note" onclick="editTeamNote()"><i class="ti ti-edit"></i></button>
+  </div>`;
+}
+window.editTeamNote = function() { teamNoteEditing = true; renderTeamNoteBox(); }
+window.cancelTeamNote = function() { teamNoteEditing = false; renderTeamNoteBox(); }
+window.saveTeamNote = async function() {
+  const text = document.getElementById('teamNoteInput').value.trim();
+  const update = { text, updatedBy: myAgentName() || currentUserName, updatedDate: new Date().toISOString().split('T')[0] };
+  try {
+    await setDoc(doc(db, 'settings', 'teamNote'), update);
+    teamNoteEditing = false;
+    renderTeamNoteBox(); // setDoc's own snapshot callback may already have re-rendered while
+                          // teamNoteEditing was still true (still in edit mode) — this final call
+                          // guarantees the box reflects the flag now being false either way.
+  } catch (err) {
+    console.error('saveTeamNote failed:', err);
+    alert('Could not save the note: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+window.clearTeamNote = async function() {
+  if (!confirm('Clear the team note for everyone?')) return;
+  try {
+    await setDoc(doc(db, 'settings', 'teamNote'), { text: '', updatedBy: myAgentName() || currentUserName, updatedDate: new Date().toISOString().split('T')[0] });
+    teamNoteEditing = false;
+    renderTeamNoteBox();
+  } catch (err) {
+    console.error('clearTeamNote failed:', err);
+    alert('Could not clear the note: ' + (err && err.message ? err.message : String(err)));
+  }
+}
+
 const SEV_RANK = { red: 0, amber: 1, neutral: 2 };
 
 function actionListRows(viewingAll) {
