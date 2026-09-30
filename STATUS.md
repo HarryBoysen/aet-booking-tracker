@@ -1,4 +1,4 @@
-[Uploading STATUS.md…]()
+[STATUS.md](https://github.com/user-attachments/files/32854441/STATUS.md)
 [STATUS.md](https://github.com/user-attachments/files/32335990/STATUS.md)
 # AET Booking Tracker – STATUS
 
@@ -183,6 +183,17 @@ To justeringer efter forrige runde: (1) eksempel-teksten "e.g. Can book to Nov" 
 - Ruter grupperes efter den bookingen de er linket til; er en billet ikke linket til en booking, grupperes den efter gæstenavn i stedet (samme kunde skrevet med samme navn havner stadig i samme boks).
 - Train Tickets-fanen er IKKE ændret — den viser stadig én flad liste, da tog normalt kun har én strækning pr. kunde.
 - Testet (Playwright, `test_ticket_multiroute_and_scroll.js` udvidet): opretter en kunde med 3 ruter og bekræfter de vises i ÉN boks (ikke 3 separate), at boksen nævner "3 routes", og at Notes-feltet ikke har eksempel-tekst. Fuld regressionssuite på 25 testscripts — ingen regressioner.
+- **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
+
+## "Cancelled" tilføjet som Booking Type – bygget og testet, AFVENTER Harrys godkendelse
+Harry spurgte om man kan tilføje "Cancelled" til Booking Type (som i dag har Real Booking og Pre-Booking). Svarede ja og spurgte hvordan en cancelled booking skal opføre sig — Harry valgte: **bliver stående i listen, men markeret** (ikke skjult som Archived).
+
+- "Cancelled" er nu en tredje valgmulighed i Booking Type-dropdown'en ved siden af Real Booking og Pre-Booking.
+- En cancelled booking bliver stående i hovedlisten (under "All"), men vises nedtonet med en grå "Cancelled"-mærkat — præcis som du bad om.
+- Den tælles IKKE længere med i "Follow-up required", "Deposit pending" eller "Active bookings" i toppen af Bookings-fanen, og dukker ikke længere op i My Action List — så en cancelled booking holder ikke længere nogen til ilden for opgaver, der reelt er annulleret.
+- Ny "Cancelled"-tæller i statistik-rækken øverst, og en ny "Cancelled"-filterknap (ved siden af "Archived"), så man hurtigt kan se alle cancelled bookinger for sig.
+- Fandt og rettede samtidig en ældre fejl: når man redigerede en eksisterende booking, blev Booking Type-feltet ALDRIG udfyldt med bookingens faktiske værdi — det stod altid tilbage på "Real Booking" i redigeringsvinduet, uanset om bookingen faktisk var en Pre-Booking. Det betød at man ved en fejl kunne komme til at nulstille en Pre-Booking til Real Booking, bare ved at redigere og gemme noget helt andet (fx rette et navn). Det er nu rettet, så feltet altid viser bookingens rigtige type, når man åbner den for redigering.
+- Testet (Playwright, ny `test_booking_cancelled.js`): opretter en booking med et ægte follow-up- og depositum-problem, markerer den Cancelled, og bekræfter at den stadig er synlig men nedtonet med badge, at den forsvinder fra statistik og Action List, og at "Cancelled"-filteret isolerer den korrekt. Bekræfter også at redigeringsvinduet nu korrekt genindlæser den gemte type. Fuld regressionssuite på 26 testscripts — ingen regressioner.
 - **Status: klar til deploy, men afventer Harrys eksplicitte godkendelse af preview/screenshot først (hans krav).**
 
 ## Åbent spørgsmål (afventer svar)
